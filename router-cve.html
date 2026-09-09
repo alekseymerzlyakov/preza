@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ИИ-агент и роутер · Как ИИ нашёл и оформил CVE за ночь</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #04070a; }
+
+    /* NB: variable NAMES kept from the CHAM deck shell for minimal coupling;
+       values are re-tinted to a "security console" palette (cyan/emerald/red). */
+    #cham-app {
+      --bg: #04070b;
+      --panel: #0a1018;
+      --panel-glass: rgba(10, 16, 24, 0.75);
+      --border: rgba(34, 211, 238, 0.22);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --text: #eaf6fb;
+      --muted: #8fa3b3;
+      --violet: #22d3ee;                       /* primary accent = cyan (scan/agent) */
+      --violet-glow: rgba(34, 211, 238, 0.45);
+      --magenta: #ec4899;
+      --cyan: #22d3ee;
+      --cyan-glow: rgba(34, 211, 238, 0.4);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.4);
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      --red: #ef4444;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Top Story Navigator ── */
+    .top-nav {
+      flex-shrink: 0;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, #071820 0%, #04070b 100%);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
+      z-index: 10;
+    }
+    .top-nav::-webkit-scrollbar { height: 3px; }
+    .top-nav::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 3px; }
+
+    .nav-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-badge:hover {
+      color: #fff;
+      border-color: var(--cyan);
+      background: rgba(34, 211, 238, 0.12);
+      transform: translateY(-1px);
+    }
+    .nav-badge.active {
+      color: #04141a;
+      background: linear-gradient(135deg, #67e8f9, #22d3ee);
+      border-color: #67e8f9;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+    .nav-badge .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.25);
+      color: inherit;
+      font-size: 0.62rem;
+      font-weight: 800;
+    }
+    .nav-sep { color: rgba(34, 211, 238, 0.35); font-size: 0.75rem; flex-shrink: 0; }
+
+    /* ── Main Layout ── */
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* ── Left Narrative Deck ── */
+    .deck-panel {
+      width: 480px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg, #071620 0%, #04070b 100%);
+      z-index: 5;
+      box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.02em;
+    }
+    .brand-title span { color: var(--cyan); }
+    .brand-subtitle { font-size: 0.7rem; color: var(--muted); font-weight: 500; margin-top: 2px; }
+
+    .btn-presenter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(34, 211, 238, 0.08);
+      color: var(--cyan);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-presenter:hover {
+      background: rgba(34, 211, 238, 0.22);
+      border-color: #67e8f9;
+      color: #fff;
+    }
+
+    .deck-scroll {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 28px 32px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .deck-scroll::-webkit-scrollbar { width: 4px; }
+    .deck-scroll::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.25); border-radius: 2px; }
+
+    .slide-view { display: none; animation: slideFade 0.35s ease-out; }
+    .slide-view.active { display: block; }
+    @keyframes slideFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .slide-tag-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .slide-tag-line::before {
+      content: '';
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .slide-title {
+      font-size: 1.85rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.18;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+
+    .slide-desc {
+      font-size: 1.02rem;
+      line-height: 1.68;
+      color: #cddbe4;
+      margin-bottom: 18px;
+    }
+    .slide-desc strong { color: #fff; font-weight: 700; }
+    .slide-desc .hl-cyan { color: var(--cyan); font-weight: 700; }
+    .slide-desc .hl-violet { color: #c084fc; font-weight: 700; }
+    .slide-desc .hl-emerald { color: var(--emerald); font-weight: 700; }
+    .slide-desc .hl-amber { color: var(--amber); font-weight: 700; }
+    .slide-desc .hl-red { color: var(--red); font-weight: 700; }
+
+    .callout-box {
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(34, 211, 238, 0.08);
+      border: 1px solid rgba(34, 211, 238, 0.28);
+      border-left: 4px solid var(--cyan);
+      color: #c6e7ef;
+      font-size: 0.92rem;
+      line-height: 1.58;
+      margin-top: 14px;
+    }
+    .callout-box.emerald {
+      background: rgba(16, 185, 129, 0.07);
+      border-color: rgba(16, 185, 129, 0.28);
+      border-left-color: var(--emerald);
+      color: #a7e5ce;
+    }
+    .callout-box.cyan {
+      background: rgba(34, 211, 238, 0.07);
+      border-color: rgba(34, 211, 238, 0.28);
+      border-left-color: var(--cyan);
+      color: #b2eaf5;
+    }
+    .callout-box.amber {
+      background: rgba(245, 158, 11, 0.07);
+      border-color: rgba(245, 158, 11, 0.28);
+      border-left-color: var(--amber);
+      color: #ecd29b;
+    }
+    .callout-box.blue {
+      background: rgba(59, 130, 246, 0.07);
+      border-color: rgba(59, 130, 246, 0.28);
+      border-left-color: var(--blue);
+      color: #b9d6fc;
+    }
+    .callout-box.red {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.3);
+      border-left-color: var(--red);
+      color: #f6b9b9;
+    }
+    .callout-box b, .callout-box strong { color: #fff; }
+
+    .code-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(34, 211, 238, 0.12);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      color: #c4f3fa;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      font-weight: 700;
+    }
+
+    /* ── Bottom Deck Controls ── */
+    .deck-controls {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      gap: 8px;
+      flex-shrink: 0;
+      background: #061019;
+    }
+    .ctl-btn {
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .ctl-btn.icon-only { width: 34px; padding: 0; font-size: 15px; }
+    .ctl-btn.primary {
+      background: var(--cyan);
+      color: #04141a;
+      border: none;
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+    .ctl-btn.primary:hover:not(:disabled) { background: #67e8f9; color: #000; }
+    .ctl-btn.ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-light);
+      color: var(--muted);
+    }
+    .ctl-btn.ghost:hover:not(:disabled) {
+      border-color: var(--cyan);
+      color: #fff;
+      background: rgba(34, 211, 238, 0.1);
+    }
+    .ctl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .deck-progress {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 0 4px;
+    }
+    .deck-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--emerald), var(--cyan));
+      transition: width 0.2s linear;
+    }
+
+    .slide-counter-badge {
+      font-size: 0.74rem;
+      font-weight: 800;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .voice-toggle-label {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .voice-toggle-label input { position: absolute; opacity: 0; pointer-events: none; }
+    .voice-toggle-label:hover { border-color: var(--cyan); }
+    .voice-toggle-label input:checked + .v-icon { color: var(--cyan); filter: drop-shadow(0 0 6px var(--cyan)); }
+    .v-icon { font-size: 15px; }
+
+    /* ── Right Stage: Interactive Physics & Graphics ── */
+    .stage-panel {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #stage-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Floating Canvas HUD Overlays */
+    .stage-hud-top {
+      position: absolute;
+      top: 18px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(6, 14, 20, 0.85);
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      backdrop-filter: blur(10px);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #dcefff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .hud-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: hudPulse 1.8s infinite;
+    }
+    @keyframes hudPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+
+    .hud-controls-group {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-action-btn {
+      padding: 7px 14px;
+      border-radius: 14px;
+      background: rgba(34, 211, 238, 0.18);
+      border: 1px solid rgba(34, 211, 238, 0.45);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
+    .hud-action-btn:hover {
+      background: var(--cyan);
+      color: #04141a;
+      box-shadow: 0 0 16px var(--cyan-glow);
+      transform: translateY(-1px);
+    }
+
+    .stage-hud-bottom {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      width: max-content;
+      max-width: min(560px, 88%);
+    }
+    .stage-scene-note {
+      pointer-events: none;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #a9c2d1;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      max-width: 100%;
+    }
+    .stage-caption-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 22px;
+      border-radius: 30px;
+      background: rgba(5, 12, 18, 0.92);
+      border: 1px solid rgba(34, 211, 238, 0.45);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      color: #edf6fa;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .stage-caption-pill .cap-icon { color: var(--cyan); font-size: 1rem; }
+
+    .interactive-dock {
+      position: absolute;
+      bottom: 106px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+    .dock-btn {
+      padding: 7px 14px;
+      border-radius: 10px;
+      background: rgba(9, 18, 26, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #d6ecf5;
+      font-size: 0.74rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s;
+    }
+    .dock-btn:hover {
+      border-color: var(--cyan);
+      color: #fff;
+      background: rgba(34, 211, 238, 0.16);
+      transform: translateY(-2px);
+    }
+    .dock-btn.active {
+      background: var(--cyan);
+      color: #04141a;
+      border-color: var(--cyan);
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+
+    .stage-legend {
+      position: absolute;
+      bottom: 20px;
+      left: 24px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(5, 12, 18, 0.82);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      pointer-events: none;
+      max-width: 250px;
+    }
+    .stage-legend .legend-title {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .stage-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #e0eef5;
+      line-height: 1.2;
+    }
+    .stage-legend .legend-dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .stage-fade {
+      position: absolute;
+      inset: 0;
+      z-index: 9;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+    }
+  </style>
+</head>
+<body>
+
+<div id="cham-app">
+  <nav class="top-nav" id="top-nav" aria-label="Путь презентации"></nav>
+
+  <div class="main-workspace">
+
+    <aside class="deck-panel">
+      <div class="brand-header">
+        <div>
+          <div class="brand-title">🤖 ИИ-агент против <span>роутера</span></div>
+          <div class="brand-subtitle">Как ИИ за ночь нашёл уязвимость и сам оформил CVE · разбор по мотивам статьи</div>
+        </div>
+        <button class="btn-presenter" id="btn-presenter" title="Открыть пульт докладчика">🖥 Пульт</button>
+      </div>
+
+      <div class="deck-scroll" id="deck-scroll"></div>
+
+      <div class="deck-controls">
+        <button id="btn-prev" class="ctl-btn ghost icon-only" aria-label="Назад" disabled>‹</button>
+        <button id="btn-play" class="ctl-btn primary">▶ Играть</button>
+        <button id="btn-restart" class="ctl-btn ghost icon-only" title="В начало">↺</button>
+        <div class="deck-progress"><div class="deck-progress-fill" id="progress-bar"></div></div>
+        <span class="slide-counter-badge" id="slide-counter">1 / 10</span>
+        <label class="voice-toggle-label" title="Озвучка (TTS)" aria-label="Голос">
+          <input type="checkbox" id="voice-toggle">
+          <span class="v-icon">🗣️</span>
+        </label>
+        <select id="vpick-select" title="Голос докладчика" aria-label="Голос докладчика" style="height:32px;border:1px solid #30363d;border-radius:7px;background:#0d1117;color:#c9d1d9;padding:0 8px;font:inherit;font-size:.8rem;cursor:pointer;max-width:160px;">
+          <option value="edge:ru-RU-DmitryNeural">🤖 Стандартный</option>
+          <option value="elevenlabs:mine">🎙 Мой голос</option>
+        </select>
+        <script>window.__voiceSlug=function(v){v=String(v||'');return v.indexOf('elevenlabs')===0?'mine':'edge';};</script>
+<script>(function(){var K='presentationVoiceChoice',D='elevenlabs:mine',s=document.getElementById('vpick-select');var v=localStorage.getItem(K);if(!v){v=D;localStorage.setItem(K,D);}s.value=[].some.call(s.options,function(o){return o.value===v})?v:D;s.addEventListener('change',function(){localStorage.setItem(K,s.value||D);});})();</script>
+        <button id="btn-next" class="ctl-btn ghost">Далее ›</button>
+      </div>
+    </aside>
+
+    <main class="stage-panel">
+      <canvas id="stage-canvas"></canvas>
+      <div class="stage-fade" id="stage-fade"></div>
+      <div class="stage-legend" id="stage-legend"></div>
+
+      <div class="stage-hud-top">
+        <div class="hud-pill">
+          <span class="hud-dot" id="hud-status-dot"></span>
+          <span id="hud-status-text">Agent Recon Engine · 60 FPS</span>
+        </div>
+        <div class="hud-controls-group" id="hud-actions"></div>
+      </div>
+
+      <div class="interactive-dock" id="interactive-dock"></div>
+
+      <div class="stage-hud-bottom">
+        <div class="stage-caption-pill">
+          <span class="cap-icon">✦</span>
+          <span id="stage-caption-text">Инициализация…</span>
+        </div>
+        <div class="stage-scene-note" id="stage-scene-note"></div>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COLORS
+  // ═══════════════════════════════════════════════════════════════════════════
+  const CY = '#22d3ee', EM = '#10b981', RED = '#ef4444', AMB = '#f59e0b',
+        VIO = '#a855f7', BLUE = '#3b82f6', MUT = '#64748b';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SLIDES DATA
+  // ═══════════════════════════════════════════════════════════════════════════
+  const slidesData = [
+    {
+      icon: '🧪', tag: 'Стенд', tagColor: CY, storyLabel: 'Домашняя лаба', mode: 'home_lab',
+      caption: 'Гипервизор + виртуалки + ИИ-агент через MCP · права под контролем',
+      sceneNote: 'Агент читает узлы свободно (зелёные потоки). Любая запись упирается в 🔒 — нужен человек.',
+      title: 'Домашняя лаба и ИИ-агент на поводке',
+      desc: `Автор держит дома гипервизор с виртуалками, а рулит ими <strong>ИИ-агент</strong> через протокол инструментов. С самого начала — жёсткие рамки: <span class="hl-emerald">чтение свободно</span>, запись — только с подтверждения, секреты в чат не выводятся.`,
+      callout: `<b>Ключ ко всей истории:</b> агенту дали не свободу действий, а <strong>границы прав</strong>. Именно они превратят «взлом» в легальное исследование.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '⌨️', tag: 'Задача', tagColor: BLUE, storyLabel: 'Скучная задача', mode: 'task_prompt',
+      caption: 'Опиши способы доступа к роутеру 192.168.1.1 и проверь связь',
+      sceneNote: 'Задача выглядит безобидно: просто задокументировать доступ к роутеру.',
+      title: 'Задача: просто опиши, как попасть на роутер',
+      desc: `Инструкция была скучной: <strong>опиши способы доступа</strong> к роутеру на 192.168.1.1, проверь связь и что вообще доступно. Ни слова про взлом.`,
+      callout: `Никто не просил искать дыры. Агент просто начал <strong>методично проверять</strong> всё подряд — и это оказалось важнее самой задачи.`,
+      calloutClass: 'blue'
+    },
+    {
+      icon: '📡', tag: 'Разведка', tagColor: CY, storyLabel: 'Разведка портов', mode: 'recon_sweep',
+      caption: 'Порты 80/443 → древний веб-сервер Boa · SSH со слабой криптографией',
+      sceneNote: 'Луч перебирает порты. Загораются 80/443 (веб) и 22 (старый SSH).',
+      title: 'Разведка портов',
+      desc: `Агент перебрал порты и нашёл веб-морду на <span class="code-badge">80/443</span> — не там, где заявлено. Сервер — <strong>Boa</strong>, реликт середины 2000-х. Рядом <strong>SSH</strong> с криптографией первого поколения: слабые шифры.`,
+      callout: `Человек бы устал перебирать. Агент прошёл всё <strong>исчерпывающе и без скуки</strong> — в этом его главная сила.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '🧩', tag: 'Реверс', tagColor: VIO, storyLabel: 'Разбор SPA', mode: 'spa_reverse',
+      caption: 'Из JS-бандлов вытащены реальные эндпоинты: чтение и запись конфига',
+      sceneNote: 'Собранный бандл распаковывается на эндпоинты: GET на чтение и POST на запись.',
+      title: 'Разбор веб-приложения',
+      desc: `Морда — одностраничное приложение. Агент вытащил из него <strong>JS-бандлы</strong> и нашёл настоящие адреса API: обработчик <span class="hl-emerald">чтения</span> конфига и обработчик <span class="hl-violet">записи</span>.`,
+      callout: `То, что спрятано в собранном коде, для агента — <strong>просто текст</strong>. Он разобрал бандл за минуты.`,
+      calloutClass: ''
+    },
+    {
+      icon: '🔓', tag: 'Находка', tagColor: RED, storyLabel: 'Конфиг без пароля', mode: 'config_leak',
+      caption: 'GET без авторизации → весь конфиг (37 КБ) → пароли в base64 → админ',
+      sceneNote: 'Запрос без пароля возвращает весь конфиг. Пароль в base64 — это не шифр: раскодировал — и ты админ.',
+      title: 'Дыра: конфиг отдаётся без пароля',
+      desc: `Обычный <span class="code-badge">GET</span> на эндпоинт чтения <strong>без всякой авторизации</strong> возвращает весь конфиг — 37 килобайт. А в нём пароли в <strong>base64</strong>. Это <span class="hl-amber">кодировка транспорта, а не шифрование</span>.`,
+      callout: `<b>Цепочка проста:</b> раскодировал base64 → получил логин и пароль администратора → зашёл. Ни одной неудачной попытки входа.`,
+      calloutClass: 'red'
+    },
+    {
+      icon: '⚖️', tag: 'Диагноз', tagColor: AMB, storyLabel: 'Асимметрия прав', mode: 'auth_asymmetry',
+      caption: 'Запись требует авторизацию, чтение — нет. Это дефект дизайна, не бэкдор',
+      sceneNote: 'Весы: чтение открыто, запись под замком. Перекос — и есть баг. Ниже — цепочка захвата.',
+      title: 'Ошибка проектирования, а не бэкдор',
+      desc: `Странность: <strong>запись</strong> конфига честно требует авторизацию, а <strong>чтение</strong> — нет. Такая <span class="hl-amber">асимметрия</span> — признак случайного дефекта, а не спрятанного бэкдора.`,
+      callout: `<b>Радиус поражения:</b> снаружи, из интернета, недоступно — только из локальной сети. Но внутри LAN это полный захват устройства. Уровень опасности высокий; затронута не одна модель — у них общий бэкенд.`,
+      calloutClass: 'amber'
+    },
+    {
+      icon: '📮', tag: 'Раскрытие', tagColor: EM, storyLabel: 'Оформление CVE', mode: 'cve_pipeline',
+      caption: 'Черновик (RU/EN) → MITRE → портал Vulnogram → письмо вендору · ≈ 3 часа',
+      sceneNote: 'Отчёт едет по конвейеру: черновик → реестр → портал → вендор. Всё примерно за три часа.',
+      title: 'Агент сам оформил CVE — за три часа',
+      desc: `Дальше агент <strong>сам</strong>: подготовил двуязычный отчёт, нашёл, куда подавать (международный реестр как инстанция последней надежды), разобрался с порталом и отправил форму. Плюс письмо вендору с шагами воспроизведения.`,
+      callout: `Вся рутина раскрытия — <strong>за ≈ 3 часа</strong>. Скучную, но точную бумажную работу агент делает быстрее и полнее человека.`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '🛡️', tag: 'Урок', tagColor: CY, storyLabel: 'Почему безопасно', mode: 'guardrail_framework',
+      caption: 'Read свободно · Write — рука человека · секреты не печатать · регресс-тесты',
+      sceneNote: 'Агент в центре, вокруг три правила. Попытка записи упирается в «руку» человека.',
+      title: 'Почему это было безопасно: рамки прав',
+      desc: `Ни одного несанкционированного изменения — кроме одного проверочного входа. Всё держали <strong>рамки</strong>: чтение свободно, любое изменение — <span class="hl-emerald">через подтверждение человека</span>, секреты не выводятся, после действий с сетью — обязательный регресс.`,
+      callout: `<b>Главная мысль:</b> ценность агента — в <strong>скорости и полноте разведки</strong>, в неутомимом переборе гипотез, а не в автономных решениях. Человек остаётся на воротах.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '🤖', tag: 'Идея для Simulator', tagColor: EM, storyLabel: 'Агент на поводке', mode: 'sim_agent_guardrails',
+      caption: 'ИИ-агент по процессам клиента: read свободно, write — только через подтверждение',
+      sceneNote: 'Агент читает все узлы графа (зелёное). Изменение узла упирается в подтверждение ✋.',
+      title: 'Что берём в Simulator: агент под теми же рамками',
+      desc: `Тот же приём — прямо в наш продукт. ИИ-агент ходит по графам процессов клиента: <span class="hl-emerald">читает и объясняет свободно</span>, а <strong>любое изменение узла — только через подтверждение</strong>. Секреты замаскированы, каждое действие — в журнал.`,
+      callout: `<b>Чего у нас нет:</b> встроенной модели прав для агента — <span class="code-badge">read по умолчанию · write ✋ · секреты скрыты · полный аудит</span>. Это превращает «страшный автономный ИИ» в управляемого помощника.`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '🔎', tag: 'Идея для Simulator', tagColor: CY, storyLabel: 'Агент-аудитор', mode: 'sim_auditor',
+      caption: 'Агент методично ищет дыры в процессах: узлы без авторизации, открытые секреты',
+      sceneNote: 'Агент прочёсывает граф и подсвечивает проблемные узлы красным. Сверху — лента replay.',
+      title: 'Агент-аудитор: находит дыры в процессах сам',
+      desc: `Та же неутомимая методичная разведка — но по <strong>нашим графам</strong>. Агент прочёсывает процессы и подсвечивает: <span class="hl-amber">узлы без авторизации</span>, секреты в открытом виде, устаревшие интеграции. Каждую находку можно <strong>переиграть (replay)</strong> и показать клиенту.`,
+      callout: `<b>Вывод:</b> ИИ-агент = неутомимый ревизор процессов, человек — принимает решения. Скорость и полнота машины плюс контроль человека — вот что стоит встроить в simulator.`,
+      calloutClass: 'cyan'
+    }
+  ];
+
+  // Пульт-only подсказки докладчику (не входят в озвучку).
+  const PRESENTER_TIPS = [
+    'Кнопка <b>«✋ Попробовать запись»</b> — покажи, как read-потоки (зелёные) идут свободно, а попытка записи упирается в замок: агент не может ничего изменить без человека. Это и есть «поводок».',
+    'Кнопка <b>«↻ Напечатать заново»</b> перезапускает набор задачи в терминале. Мысль для зала: задача абсолютно рутинная — «опиши доступ». Никто не заказывал взлом.',
+    'Кнопка <b>«🔄 Просканировать заново»</b> прогоняет луч по портам. Обрати внимание: 80/443 — веб на древнем Boa, 22 — старый SSH. Агент перебирает <b>всё</b>, не уставая.',
+    'Кнопка <b>«🧩 Распаковать снова»</b> вскрывает JS-бандл на реальные эндпоинты. Подчеркни: собранный код для агента — просто текст; он находит скрытые адреса API за минуты.',
+    'Кнопка <b>«▶ Повторить утечку»</b> проигрывает главный момент: GET без пароля → 37 КБ конфига → строка пароля в base64 декодируется в логин админа. base64 — это НЕ шифрование.',
+    'Сцена сама качает весы: <b>чтение открыто</b> перевешивает <b>запись под замком</b>. Внизу — цепочка захвата: чтение → creds → вход → админ. Скажи: это дефект дизайна, не бэкдор; опасно только из LAN, но там — полный контроль.',
+    'Кнопка <b>«▶ Отправить заново»</b> гонит отчёт по конвейеру: черновик RU/EN → реестр (инстанция последней надежды) → портал → вендор. Часы показывают ≈ 3 часа. Агент силён в скучной точной рутине.',
+    'Кнопка <b>«✋ Проверить запись»</b> — вокруг агента три правила: read свободно, write через руку человека, секреты не печатать. Попытка записи блокируется. Вывод: ценность — в разведке, решения за человеком.',
+    'Кнопка <b>«✋ Изменить узел»</b>: агент читает весь граф процесса свободно (зелёные волны), но изменение любого узла требует подтверждения ✋, и всё пишется в аудит. Чего у нас нет — именно такой встроенной модели прав для ИИ-агента.',
+    'Кнопка <b>«🔎 Просканировать»</b>: агент прочёсывает граф и сам помечает красным проблемные узлы — без авторизации, открытый секрет, устаревшая интеграция. Сверху лента replay — любую находку можно переиграть для клиента. Вывод: агент-ревизор + человек на решениях.'
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CANVAS ENGINE
+  // ═══════════════════════════════════════════════════════════════════════════
+  const canvas = document.getElementById('stage-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Projector readability: enlarge EVERY on-canvas label uniformly.
+  const FONT_SCALE = 1.35;
+  const _fontDesc = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'font');
+  Object.defineProperty(ctx, 'font', {
+    configurable: true,
+    get() { return _fontDesc.get.call(this); },
+    set(v) {
+      _fontDesc.set.call(this, String(v).replace(/(\d+(?:\.\d+)?)px/, (m, n) => (parseFloat(n) * FONT_SCALE).toFixed(1) + 'px'));
+    }
+  });
+
+  let width = 0, height = 0, dpr = 1;
+  function resizeCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    width = rect.width; height = rect.height;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.resetTransform && ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  let currentSlide = 0;
+  let animTime = 0;
+  let shockwaves = [];
+  let sparks = [];
+  let customState = {};
+
+  function addSparks(x, y, color, count = 16, maxSpeed = 5) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * maxSpeed;
+      sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 1.0, decay: 0.02 + Math.random() * 0.03, color, size: 2 + Math.random() * 3 });
+    }
+  }
+  function addShockwave(x, y, color, maxRadius = 80) {
+    shockwaves.push({ x, y, radius: 5, maxRadius, life: 1.0, decay: 0.03, color });
+  }
+
+  // ── Shared draw helpers ──
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function box(x, y, w, h, color, title, sub, opts) {
+    opts = opts || {};
+    ctx.save();
+    rr(x, y, w, h, opts.radius || 12);
+    ctx.fillStyle = opts.bg || 'rgba(8,16,24,0.88)';
+    ctx.fill();
+    ctx.lineWidth = opts.lw || 2;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color; ctx.shadowBlur = opts.glow != null ? opts.glow : 14;
+    ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (title) {
+      ctx.fillStyle = '#fff'; ctx.font = '700 15px Inter';
+      ctx.fillText(title, x + w / 2, y + h / 2 - (sub ? 9 : 0));
+    }
+    if (sub) { ctx.fillStyle = color; ctx.font = '700 12px JetBrains Mono'; ctx.fillText(sub, x + w / 2, y + h / 2 + 11); }
+    ctx.restore();
+  }
+  function line(x1, y1, x2, y2, color, w, dash) {
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = w || 2;
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.restore();
+  }
+  function flowDots(x1, y1, x2, y2, color, speed, count, size) {
+    for (let i = 0; i < count; i++) {
+      const t = ((animTime * speed + i / count) % 1);
+      const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
+      ctx.save();
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
+      ctx.globalAlpha = 0.35 + 0.5 * Math.sin(t * Math.PI);
+      ctx.beginPath(); ctx.arc(x, y, size || 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  function label(txt, x, y, color, size, weight, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = (weight || 700) + ' ' + (size || 13) + 'px Inter';
+    ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+  function mono(txt, x, y, color, size, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = '700 ' + (size || 13) + 'px JetBrains Mono';
+    ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCENE INITIALIZATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  function buildProcessGraph() {
+    customState.nodes = [
+      { x: width * 0.26, y: height * 0.30, icon: '▶', label: 'Старт' },
+      { x: width * 0.46, y: height * 0.22, icon: '◈', label: 'Условие' },
+      { x: width * 0.66, y: height * 0.34, icon: '⚙', label: 'API-вызов' },
+      { x: width * 0.80, y: height * 0.55, icon: '✓', label: 'Проверка прав' },
+      { x: width * 0.58, y: height * 0.66, icon: '⛁', label: 'Запись в БД' },
+      { x: width * 0.36, y: height * 0.58, icon: '✉', label: 'Уведомление' }
+    ];
+    customState.edges = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[1,4]];
+  }
+
+  function initScene(slideIndex) {
+    shockwaves = []; sparks = []; customState = {};
+    const mode = slidesData[slideIndex].mode;
+
+    if (mode === 'task_prompt') {
+      customState.prog = 0;
+    } else if (mode === 'recon_sweep') {
+      customState.sweepX = 0;
+      customState.ports = [
+        { p: 22,  label: 'SSH · слабый', color: AMB, open: true },
+        { p: 80,  label: 'HTTP · Boa',   color: EM,  open: true },
+        { p: 443, label: 'HTTPS · Boa',  color: EM,  open: true }
+      ];
+      customState.found = {};
+    } else if (mode === 'spa_reverse') {
+      customState.unpack = 0;
+    } else if (mode === 'config_leak') {
+      customState.leakT = 0;
+    } else if (mode === 'cve_pipeline') {
+      customState.docT = 0;
+    } else if (mode === 'guardrail_framework' || mode === 'home_lab') {
+      customState.writeTry = 0;
+    } else if (mode === 'sim_agent_guardrails' || mode === 'sim_auditor') {
+      buildProcessGraph();
+      if (mode === 'sim_auditor') { customState.scanX = 0; customState.flagged = {}; }
+      if (mode === 'sim_agent_guardrails') { customState.approveNode = -1; customState.approveT = 0; customState.audit = []; }
+    }
+
+    renderHUDControls(slideIndex);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HUD CONTROLS
+  // ═══════════════════════════════════════════════════════════════════════════
+  function renderHUDControls(slideIndex) {
+    const hudGroup = document.getElementById('hud-actions');
+    const dockGroup = document.getElementById('interactive-dock');
+    hudGroup.innerHTML = ''; dockGroup.innerHTML = '';
+    const mode = slidesData[slideIndex].mode;
+
+    const hudBtn = (html, onclick) => {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn'; b.innerHTML = html; b.onclick = onclick;
+      hudGroup.appendChild(b);
+    };
+
+    if (mode === 'home_lab') {
+      hudBtn('✋ Попробовать запись', () => { customState.writeTry = 1.0; });
+    } else if (mode === 'task_prompt') {
+      hudBtn('↻ Напечатать заново', () => { customState.prog = 0; });
+    } else if (mode === 'recon_sweep') {
+      hudBtn('🔄 Просканировать заново', () => { customState.sweepX = 0; customState.found = {}; });
+    } else if (mode === 'spa_reverse') {
+      hudBtn('🧩 Распаковать снова', () => { customState.unpack = 0; });
+    } else if (mode === 'config_leak') {
+      hudBtn('▶ Повторить утечку', () => { customState.leakT = 0; });
+    } else if (mode === 'cve_pipeline') {
+      hudBtn('▶ Отправить заново', () => { customState.docT = 0; });
+    } else if (mode === 'guardrail_framework') {
+      hudBtn('✋ Проверить запись', () => { customState.writeTry = 1.0; });
+    } else if (mode === 'sim_agent_guardrails') {
+      hudBtn('✋ Изменить узел', () => {
+        customState.approveNode = Math.floor(Math.random() * customState.nodes.length);
+        customState.approveT = 1.0;
+        customState.audit.unshift('write → ' + customState.nodes[customState.approveNode].label + ' · ждёт ✋');
+        customState.audit = customState.audit.slice(0, 4);
+      });
+    } else if (mode === 'sim_auditor') {
+      hudBtn('🔎 Просканировать', () => { customState.scanX = 0; customState.flagged = {}; });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN LOOP
+  // ═══════════════════════════════════════════════════════════════════════════
+  function animate() {
+    requestAnimationFrame(animate);
+    animTime += 0.016;
+    ctx.clearRect(0, 0, width, height);
+    drawBackgroundGrid();
+
+    const mode = slidesData[currentSlide].mode;
+    if (mode === 'home_lab') renderHomeLab();
+    else if (mode === 'task_prompt') renderTaskPrompt();
+    else if (mode === 'recon_sweep') renderReconSweep();
+    else if (mode === 'spa_reverse') renderSpaReverse();
+    else if (mode === 'config_leak') renderConfigLeak();
+    else if (mode === 'auth_asymmetry') renderAuthAsymmetry();
+    else if (mode === 'cve_pipeline') renderCvePipeline();
+    else if (mode === 'guardrail_framework') renderGuardrail();
+    else if (mode === 'sim_agent_guardrails') renderSimAgent();
+    else if (mode === 'sim_auditor') renderSimAuditor();
+
+    renderEffects();
+  }
+
+  function drawBackgroundGrid() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.05)';
+    ctx.lineWidth = 1;
+    const step = 44;
+    for (let x = 0; x < width; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+    for (let y = 0; y < height; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // ── Scene 1: home lab ──
+  function renderHomeLab() {
+    const hv = { x: width * 0.42, y: height * 0.5 };
+    const agent = { x: width * 0.14, y: height * 0.5 };
+    const vms = [
+      { x: width * 0.78, y: height * 0.26 },
+      { x: width * 0.80, y: height * 0.5 },
+      { x: width * 0.78, y: height * 0.74 }
+    ];
+
+    // edges agent → hypervisor (MCP)
+    line(agent.x + 46, agent.y, hv.x - 60, hv.y, 'rgba(34,211,238,0.4)', 2, [6, 6]);
+    flowDots(agent.x + 46, agent.y, hv.x - 60, hv.y, CY, 0.4, 4, 3);
+    label('MCP', (agent.x + hv.x) / 2, agent.y - 22, CY, 11, 700);
+
+    // hypervisor → VMs : read (green) flows
+    vms.forEach(vm => {
+      line(hv.x + 60, hv.y, vm.x - 42, vm.y, 'rgba(16,185,129,0.35)', 2);
+      flowDots(hv.x + 60, hv.y, vm.x - 42, vm.y, EM, 0.5, 3, 3);
+    });
+
+    // write attempt (blocked at gate)
+    if (customState.writeTry > 0) {
+      customState.writeTry -= 0.012;
+      const vm = vms[1];
+      const gx = (hv.x + 60 + vm.x - 42) / 2, gy = (hv.y + vm.y) / 2;
+      const t = Math.min(1, (1 - customState.writeTry) * 2);
+      const px = hv.x + 60 + (gx - (hv.x + 60)) * Math.min(t, 1);
+      const py = hv.y + (gy - hv.y) * Math.min(t, 1);
+      ctx.save(); ctx.fillStyle = VIO; ctx.shadowColor = VIO; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      // lock gate
+      label('🔒', gx, gy, RED, 26, 700);
+      label('нужен человек', gx, gy + 28, RED, 12, 800);
+      if (t >= 1 && !customState._wsPulsed) { addShockwave(gx, gy, RED, 60); customState._wsPulsed = true; }
+      if (customState.writeTry <= 0) customState._wsPulsed = false;
+    }
+
+    box(agent.x - 46, agent.y - 34, 92, 68, CY, '', '', { glow: 18 });
+    label('🤖', agent.x, agent.y - 6, '#fff', 24, 700);
+    label('ИИ-агент', agent.x, agent.y + 18, CY, 12, 800);
+
+    box(hv.x - 60, hv.y - 42, 120, 84, '#67e8f9', '', '', { glow: 16 });
+    label('🖥', hv.x, hv.y - 10, '#fff', 24, 700);
+    label('Гипервизор', hv.x, hv.y + 16, '#a5f3fc', 12, 800);
+
+    vms.forEach((vm, i) => {
+      box(vm.x - 42, vm.y - 30, 84, 60, EM, '', '', { glow: 10 });
+      label('VM ' + (i + 1), vm.x, vm.y - 4, '#fff', 13, 800);
+      label('🔓 read', vm.x, vm.y + 15, EM, 11, 700);
+    });
+  }
+
+  // ── Scene 2: task prompt terminal ──
+  function renderTaskPrompt() {
+    const w = Math.min(width * 0.7, 620), h = Math.min(height * 0.5, 330);
+    const x = width / 2 - w / 2, y = height / 2 - h / 2 - 10;
+    // window
+    box(x, y, w, h, CY, '', '', { glow: 18, bg: 'rgba(4,12,18,0.95)', radius: 14 });
+    // titlebar
+    ctx.save(); rr(x, y, w, 34, 14); ctx.fillStyle = 'rgba(34,211,238,0.12)'; ctx.fill(); ctx.restore();
+    [['#ef4444', 0], ['#f59e0b', 1], ['#10b981', 2]].forEach(([c, i]) => {
+      ctx.save(); ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + 20 + i * 18, y + 17, 5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    });
+    mono('agent@homelab ~ %', x + 78, y + 17, MUT, 12, 'left');
+
+    customState.prog = (customState.prog || 0) + 0.7;
+    const lines = [
+      { t: '$ задача: опиши, как попасть на роутер', c: '#eaf6fb' },
+      { t: '  цель: 192.168.1.1', c: CY },
+      { t: '  проверь связь и что доступно', c: '#c6d5df' },
+      { t: '  ⚠ ни слова про уязвимости', c: AMB }
+    ];
+    let shown = customState.prog;
+    let ly = y + 66;
+    for (const ln of lines) {
+      const n = Math.max(0, Math.min(ln.t.length, Math.floor(shown)));
+      mono(ln.t.slice(0, n), x + 26, ly, ln.c, 15, 'left');
+      shown -= ln.t.length;
+      if (shown < 0) {
+        // cursor
+        if (Math.floor(animTime * 2) % 2 === 0) {
+          ctx.save(); ctx.fillStyle = CY;
+          ctx.fillRect(x + 26 + ctx.measureText(ln.t.slice(0, n)).width * 0 + n * 9 * FONT_SCALE, ly - 9, 9, 18);
+          ctx.restore();
+        }
+        break;
+      }
+      ly += 34;
+    }
+
+    // router chip appears once fully typed
+    const total = lines.reduce((s, l) => s + l.t.length, 0);
+    if (customState.prog > total + 20) {
+      const rx = width / 2, ry = y + h + 44;
+      box(rx - 90, ry - 24, 180, 48, BLUE, '', '', { glow: 14 });
+      label('🌐 192.168.1.1', rx, ry - 2, '#fff', 14, 800);
+      const pulse = 0.5 + 0.5 * Math.sin(animTime * 3);
+      ctx.save(); ctx.globalAlpha = pulse; ctx.fillStyle = EM; ctx.shadowColor = EM; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(rx + 66, ry, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      label('ping ok', rx, ry + 15, EM, 10, 700);
+    }
+  }
+
+  // ── Scene 3: recon sweep ──
+  function renderReconSweep() {
+    const barY = height * 0.5;
+    const x0 = width * 0.12, x1 = width * 0.88, span = x1 - x0;
+    // ruler
+    line(x0, barY, x1, barY, 'rgba(148,163,184,0.35)', 2);
+    // port ticks (0..1024 mapped)
+    const maxPort = 1024;
+    for (let p = 0; p <= maxPort; p += 64) {
+      const px = x0 + (p / maxPort) * span;
+      line(px, barY - 6, px, barY + 6, 'rgba(148,163,184,0.25)', 1);
+    }
+    label('порты 1 … 1024', width / 2, barY + 54, MUT, 12, 700);
+
+    // sweep beam
+    customState.sweepX = Math.min(1, (customState.sweepX || 0) + 0.006);
+    const beam = x0 + customState.sweepX * span;
+    ctx.save();
+    const grad = ctx.createLinearGradient(beam - 40, 0, beam, 0);
+    grad.addColorStop(0, 'rgba(34,211,238,0)'); grad.addColorStop(1, 'rgba(34,211,238,0.5)');
+    ctx.fillStyle = grad; ctx.fillRect(beam - 40, barY - 120, 40, 240);
+    ctx.strokeStyle = CY; ctx.lineWidth = 2; ctx.shadowColor = CY; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.moveTo(beam, barY - 120); ctx.lineTo(beam, barY + 120); ctx.stroke();
+    ctx.restore();
+
+    // discovered ports
+    customState.ports.forEach((port, i) => {
+      const px = x0 + (port.p / maxPort) * span;
+      const passed = beam >= px;
+      if (passed && !customState.found[port.p]) {
+        customState.found[port.p] = true;
+        addShockwave(px, barY, port.color, 60);
+        addSparks(px, barY, port.color, 16, 5);
+      }
+      if (passed) {
+        // marker
+        ctx.save(); ctx.fillStyle = port.color; ctx.shadowColor = port.color; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(px, barY, 9, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        // callout above/below alternating
+        const up = i !== 1;
+        const ly = up ? barY - 60 : barY + 78;
+        box(px - 74, ly - 20, 148, 40, port.color, '', '', { glow: 10 });
+        mono(':' + port.p, px - 60, ly, port.color, 13, 'left');
+        label(port.label, px + 12, ly, '#fff', 12, 800);
+      } else {
+        ctx.save(); ctx.fillStyle = 'rgba(100,116,139,0.5)';
+        ctx.beginPath(); ctx.arc(px, barY, 5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+    });
+
+    if (customState.sweepX >= 1) {
+      label('найдено 3 открытых порта · веб не на заявленном порту', width / 2, height * 0.16, EM, 14, 800);
+    }
+  }
+
+  // ── Scene 4: SPA reverse ──
+  function renderSpaReverse() {
+    customState.unpack = Math.min(1, (customState.unpack || 0) + 0.008);
+    const bx = width * 0.16, by = height * 0.32, bw = 200, bh = height * 0.36;
+    // bundle block
+    box(bx, by, bw, bh, CY, '', '', { glow: 14, bg: 'rgba(4,14,20,0.95)' });
+    label('📦 bundle.js', bx + bw / 2, by + 22, '#fff', 14, 800);
+    ctx.save();
+    for (let i = 0; i < 9; i++) {
+      const shimmer = 0.2 + 0.3 * Math.abs(Math.sin(animTime * 2 + i));
+      ctx.fillStyle = 'rgba(34,211,238,' + shimmer + ')';
+      const lw = 40 + ((i * 37) % (bw - 80));
+      ctx.fillRect(bx + 20, by + 44 + i * 20, lw, 7);
+    }
+    ctx.restore();
+
+    // extracted endpoints
+    const eps = [
+      { label: 'GET  /cgi/read', sub: '→ конфиг устройства', color: EM, lock: '🔓', y: height * 0.34 },
+      { label: 'POST /cgi/write', sub: '→ запись конфига', color: VIO, lock: '🔒', y: height * 0.60 }
+    ];
+    eps.forEach((ep, i) => {
+      const t = Math.max(0, Math.min(1, (customState.unpack - 0.2 - i * 0.25) / 0.4));
+      if (t <= 0) return;
+      const startX = bx + bw, endX = width * 0.56;
+      const ex = startX + (endX - startX) * t;
+      const ey = ep.y;
+      ctx.globalAlpha = t;
+      line(bx + bw, by + bh / 2, ex, ey, 'rgba(148,163,184,0.4)', 2, [5, 5]);
+      box(ex, ey - 26, 250, 52, ep.color, '', '', { glow: 12 });
+      mono(ep.label, ex + 16, ey - 6, ep.color, 14, 'left');
+      label(ep.lock, ex + 224, ey - 6, ep.color, 16);
+      label(ep.sub, ex + 125, ey + 13, '#cdd8e0', 11, 700);
+      ctx.globalAlpha = 1;
+    });
+
+    if (customState.unpack >= 1) {
+      label('реальные адреса API найдены в собранном коде', width / 2, height * 0.15, CY, 14, 800);
+    }
+  }
+
+  // ── Scene 5: config leak (money shot) ──
+  function renderConfigLeak() {
+    customState.leakT = (customState.leakT || 0) + 0.008;
+    const t = customState.leakT;
+
+    // request pill (left)
+    const reqX = width * 0.10, reqY = height * 0.5;
+    box(reqX, reqY - 34, 210, 68, EM, '', '', { glow: 14 });
+    mono('GET /cgi/read', reqX + 16, reqY - 8, '#fff', 14, 'left');
+    label('без авторизации 🔓', reqX + 105, reqY + 15, EM, 12, 800);
+
+    // arrow to dump
+    const dx = width * 0.44;
+    line(reqX + 210, reqY, dx, height * 0.35, 'rgba(16,185,129,0.5)', 2);
+    if (t > 0.15) flowDots(reqX + 210, reqY, dx, height * 0.35, EM, 0.6, 4, 3);
+
+    // config dump panel (right)
+    const px = width * 0.44, py = height * 0.16, pw = width * 0.46, ph = height * 0.62;
+    const alertPulse = t > 1.4 ? (0.5 + 0.5 * Math.sin(animTime * 5)) : 0;
+    box(px, py, pw, ph, t > 1.4 ? RED : '#67e8f9', '', '', { glow: 14 + alertPulse * 16, bg: 'rgba(3,10,16,0.96)' });
+    // header
+    ctx.save(); rr(px, py, pw, 32, 12); ctx.fillStyle = 'rgba(34,211,238,0.10)'; ctx.fill(); ctx.restore();
+    mono('config.dump', px + 16, py + 16, '#cdeef6', 12, 'left');
+    label('37 КБ · 200 OK', px + pw - 16, py + 16, t > 1.4 ? RED : EM, 12, 800, 'right');
+
+    // scrolling lines
+    const dumpLines = [
+      ['wan.mode', 'router'], ['lan.ip', '192.168.1.1'], ['wifi.ssid', 'HOME-5G'],
+      ['admin.user', 'admin'], ['admin.pass', 'cGFzc3dvcmQ='], ['ppp.user', 'user01'],
+      ['ppp.pass', 'c2VjcmV0MTIz'], ['dns.1', '8.8.8.8'], ['fw.mgmt', 'lan-only']
+    ];
+    const nShown = Math.min(dumpLines.length, Math.floor(t * 6));
+    let ly = py + 52;
+    for (let i = 0; i < nShown; i++) {
+      const [k, v] = dumpLines[i];
+      const isPass = k === 'admin.pass';
+      mono(k, px + 20, ly, '#7fa8b8', 13, 'left');
+      mono(v, px + pw * 0.5, ly, isPass ? AMB : '#c6d5df', 13, 'left');
+      if (isPass && t > 1.0) {
+        // highlight box around the base64 pass
+        ctx.save(); ctx.strokeStyle = AMB; ctx.lineWidth = 1.5; ctx.shadowColor = AMB; ctx.shadowBlur = 8;
+        const vw = 130;
+        rr(px + pw * 0.5 - 6, ly - 12, vw, 24, 5); ctx.stroke(); ctx.restore();
+        customState._passY = ly;
+      }
+      ly += 26;
+    }
+
+    // decode reveal
+    if (t > 1.5) {
+      const cy2 = py + ph - 44;
+      box(px + pw / 2 - 150, cy2 - 22, 300, 46, RED, '', '', { glow: 14 });
+      label('base64 → decode', px + pw / 2, cy2 - 4, '#fff', 12, 800);
+      mono('admin : password', px + pw / 2 - 70, cy2 + 14, RED, 14, 'left');
+      if (!customState._decoded) { addShockwave(px + pw / 2, cy2, RED, 90); customState._decoded = true; }
+    } else { customState._decoded = false; }
+
+    if (t > 1.5) label('доступ администратора получен — без единой попытки входа', width / 2, height * 0.90, RED, 13, 800);
+  }
+
+  // ── Scene 6: auth asymmetry (scale + chain) ──
+  function renderAuthAsymmetry() {
+    const cx = width * 0.5, cy = height * 0.34;
+    const tilt = -0.14 + 0.02 * Math.sin(animTime * 1.5); // read side heavier → tilts down-left
+    // fulcrum
+    line(cx, cy, cx, cy + 70, '#94a3b8', 4);
+    ctx.save(); ctx.fillStyle = '#94a3b8'; ctx.beginPath();
+    ctx.moveTo(cx - 16, cy + 70); ctx.lineTo(cx + 16, cy + 70); ctx.lineTo(cx, cy + 40); ctx.closePath(); ctx.fill(); ctx.restore();
+    // beam
+    const bw = width * 0.30;
+    const lx = cx - bw * Math.cos(tilt), ly = cy - bw * Math.sin(tilt);
+    const rx = cx + bw * Math.cos(tilt), ry = cy + bw * Math.sin(tilt);
+    line(lx, ly, rx, ry, CY, 4);
+    // left pan: READ open (heavy)
+    line(lx, ly, lx, ly + 34, '#94a3b8', 2);
+    box(lx - 90, ly + 34, 180, 56, EM, '', '', { glow: 14 });
+    label('🔓 READ', lx, ly + 52, '#fff', 15, 800);
+    label('без авторизации', lx, ly + 74, EM, 12, 700);
+    // right pan: WRITE locked (light)
+    line(rx, ry, rx, ry + 34, '#94a3b8', 2);
+    box(rx - 90, ry + 34, 180, 56, VIO, '', '', { glow: 14 });
+    label('🔒 WRITE', rx, ry + 52, '#fff', 15, 800);
+    label('требует авторизацию', rx, ry + 74, VIO, 12, 700);
+
+    label('асимметрия = случайный дефект дизайна, не бэкдор', width / 2, height * 0.08, AMB, 14, 800);
+
+    // compromise chain
+    const chain = [['📥', 'чтение'], ['🔑', 'creds'], ['➡', 'вход'], ['👑', 'админ']];
+    const chY = height * 0.80, startX = width * 0.20, gap = (width * 0.60) / (chain.length - 1);
+    const active = Math.floor(animTime * 1.2) % (chain.length + 1);
+    for (let i = 0; i < chain.length; i++) {
+      const x = startX + i * gap;
+      if (i < chain.length - 1) {
+        const lit = i < active;
+        line(x + 40, chY, x + gap - 40, chY, lit ? RED : 'rgba(148,163,184,0.3)', lit ? 3 : 2);
+        if (lit) flowDots(x + 40, chY, x + gap - 40, chY, RED, 0.8, 2, 3);
+      }
+      const on = i < active;
+      box(x - 40, chY - 30, 80, 60, on ? RED : '#334155', '', '', { glow: on ? 14 : 4 });
+      label(chain[i][0], x, chY - 8, '#fff', 20);
+      label(chain[i][1], x, chY + 15, on ? RED : '#94a3b8', 11, 800);
+    }
+    label('внутри LAN — полный захват устройства', width / 2, height * 0.62, RED, 13, 800);
+  }
+
+  // ── Scene 7: CVE pipeline ──
+  function renderCvePipeline() {
+    customState.docT = (customState.docT || 0) + 0.006;
+    const t = customState.docT;
+    const stations = [
+      { icon: '📝', label: 'Черновик', sub: 'RU / EN', color: CY },
+      { icon: '🏛', label: 'Реестр', sub: 'инстанция послед. надежды', color: BLUE },
+      { icon: '📋', label: 'Портал', sub: 'форма подачи', color: VIO },
+      { icon: '✉', label: 'Вендор', sub: 'шаги воспроизведения', color: EM }
+    ];
+    const y = height * 0.46;
+    const x0 = width * 0.13, x1 = width * 0.87, span = x1 - x0;
+    // track
+    line(x0, y, x1, y, 'rgba(148,163,184,0.3)', 3);
+    const progX = x0 + Math.min(1, t / stations.length) * span;
+    line(x0, y, progX, y, EM, 3);
+
+    stations.forEach((st, i) => {
+      const x = x0 + (i / (stations.length - 1)) * span;
+      const reached = t >= i + 0.5;
+      const col = reached ? EM : st.color;
+      box(x - 62, y - 46, 124, 92, col, '', '', { glow: reached ? 16 : 8 });
+      label(st.icon, x, y - 20, '#fff', 26);
+      label(st.label, x, y + 8, '#fff', 13, 800);
+      label(st.sub, x, y + 26, reached ? EM : '#9fb2bf', 9.5, 700);
+      if (reached) {
+        label('✓', x + 44, y - 32, EM, 18, 900);
+        if (!customState['st' + i]) { customState['st' + i] = true; addSparks(x, y, EM, 14, 4); }
+      }
+    });
+
+    // traveling doc token
+    if (t < stations.length) {
+      const tx = x0 + Math.min(1, t / stations.length) * span;
+      ctx.save(); ctx.fillStyle = '#fff'; ctx.shadowColor = CY; ctx.shadowBlur = 14;
+      ctx.font = '700 22px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('📄', tx, y - 66); ctx.restore();
+    }
+
+    // clock
+    const clockFill = Math.min(1, t / stations.length);
+    const clx = width / 2, cly = height * 0.80;
+    box(clx - 90, cly - 24, 180, 48, clockFill >= 1 ? EM : AMB, '', '', { glow: 12 });
+    label('⏱ ≈ 3 часа', clx, cly, '#fff', 15, 800);
+    if (clockFill >= 1) label('всё раскрытие — автоматически, за один вечер', width / 2, height * 0.90, EM, 13, 800);
+  }
+
+  // ── Scene 8: guardrail framework ──
+  function renderGuardrail() {
+    const cx = width * 0.44, cy = height * 0.5;
+    // agent center
+    ctx.save(); ctx.fillStyle = 'rgba(34,211,238,0.10)'; ctx.beginPath(); ctx.arc(cx, cy, 58, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    box(cx - 44, cy - 40, 88, 80, CY, '', '', { glow: 20 });
+    label('🤖', cx, cy - 8, '#fff', 28);
+    label('агент', cx, cy + 22, CY, 12, 800);
+
+    // orbiting rule chips
+    const rules = [
+      { icon: '✅', txt: 'read: свободно', color: EM },
+      { icon: '✋', txt: 'write: рука человека', color: AMB },
+      { icon: '🙈', txt: 'секреты: не печатать', color: VIO }
+    ];
+    rules.forEach((r, i) => {
+      const ang = animTime * 0.4 + (i / rules.length) * Math.PI * 2;
+      const rad = 150;
+      const x = cx + Math.cos(ang) * rad, y = cy + Math.sin(ang) * rad * 0.72;
+      line(cx, cy, x, y, 'rgba(148,163,184,0.2)', 1, [4, 4]);
+      box(x - 96, y - 20, 192, 40, r.color, '', '', { glow: 10 });
+      label(r.icon, x - 74, y, r.color, 16);
+      label(r.txt, x + 8, y, '#fff', 12.5, 800);
+    });
+
+    // write attempt to external system → blocked
+    const sysX = width * 0.86, sysY = cy;
+    box(sysX - 50, sysY - 34, 100, 68, '#475569', 'система', '', { glow: 6 });
+    line(cx + 44, cy, sysX - 50, sysY, 'rgba(148,163,184,0.3)', 2);
+    // continuous read pass (green)
+    flowDots(cx + 44, cy, sysX - 50, sysY, EM, 0.4, 3, 3);
+
+    if (customState.writeTry > 0) {
+      customState.writeTry -= 0.01;
+      const gx = (cx + 44 + sysX - 50) / 2, gy = cy;
+      const t = Math.min(1, (1 - customState.writeTry) * 2);
+      const px = cx + 44 + (gx - (cx + 44)) * Math.min(t, 1);
+      ctx.save(); ctx.fillStyle = AMB; ctx.shadowColor = AMB; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(px, gy - 30, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      label('✋', gx, gy - 30, RED, 26);
+      label('нужно подтверждение', gx, gy - 58, RED, 12, 800);
+      if (t >= 1 && !customState._gp) { addShockwave(gx, gy - 30, RED, 55); customState._gp = true; }
+      if (customState.writeTry <= 0) customState._gp = false;
+    }
+
+    label('0 несанкционированных изменений · 1 проверочный вход', width / 2, height * 0.12, EM, 14, 800);
+  }
+
+  // ── Graph drawing shared by sim scenes ──
+  function drawGraph(opts) {
+    opts = opts || {};
+    const nodes = customState.nodes, edges = customState.edges;
+    if (!nodes) return;
+    // edges
+    edges.forEach(([a, b]) => {
+      const na = nodes[a], nb = nodes[b];
+      line(na.x, na.y, nb.x, nb.y, 'rgba(59,130,246,0.35)', 2);
+      if (opts.flow) flowDots(na.x, na.y, nb.x, nb.y, opts.flowColor || EM, 0.35, 2, 2.5);
+    });
+    // nodes
+    const r = 30;
+    nodes.forEach((n, i) => {
+      const bad = opts.flagged && opts.flagged[i];
+      const read = opts.readPulse != null ? opts.readPulse : 0;
+      let col = bad ? RED : BLUE;
+      ctx.save();
+      if (read > 0 && !bad) {
+        const p = (read + i * 0.13) % 1;
+        ctx.globalAlpha = (1 - p) * 0.5;
+        ctx.strokeStyle = EM; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(n.x, n.y, r + p * 20, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(8,16,26,0.92)'; ctx.fill();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = bad ? 18 : 10;
+      ctx.stroke(); ctx.restore();
+      label(n.icon, n.x, n.y - 1, '#fff', 18);
+      label(n.label, n.x, n.y + r + 12, bad ? RED : '#c6d5df', 11, 800);
+      if (bad && opts.flagLabels && opts.flagLabels[i]) {
+        box(n.x - 78, n.y - r - 34, 156, 26, RED, '', '', { glow: 10 });
+        label(opts.flagLabels[i], n.x, n.y - r - 21, '#fff', 11, 800);
+      }
+      if (opts.approveNode === i && opts.approveT > 0) {
+        label('✋', n.x + r + 6, n.y - r - 4, AMB, 22);
+      }
+    });
+  }
+
+  // ── Scene 9: sim agent guardrails ──
+  function renderSimAgent() {
+    const readPulse = (animTime * 0.5) % 1;
+    if (customState.approveT > 0) customState.approveT -= 0.006;
+    drawGraph({ flow: false, readPulse, approveNode: customState.approveNode, approveT: customState.approveT });
+
+    // agent badge
+    const ax = width * 0.14, ay = height * 0.16;
+    box(ax - 40, ay - 24, 130, 48, CY, '', '', { glow: 14 });
+    label('🤖 агент', ax + 25, ay, '#fff', 14, 800);
+
+    label('читает весь процесс свободно (зелёные волны)', width / 2, height * 0.10, EM, 13, 800);
+
+    // approval banner
+    if (customState.approveNode >= 0 && customState.approveT > 0) {
+      const n = customState.nodes[customState.approveNode];
+      const bx = width / 2 - 150, by = height * 0.84;
+      box(bx, by - 22, 300, 44, AMB, '', '', { glow: 14 });
+      label('✋ запись в «' + n.label + '» — ждёт подтверждения', width / 2, by, '#fff', 12, 800);
+    }
+
+    // audit log (bottom-right)
+    const audit = customState.audit || [];
+    if (audit.length) {
+      const lx = width * 0.62, lyy = height * 0.20;
+      box(lx, lyy, width * 0.32, 24 + audit.length * 20, VIO, '', '', { glow: 8, bg: 'rgba(6,12,18,0.9)' });
+      label('📓 аудит', lx + 50, lyy + 14, VIO, 11, 800);
+      audit.forEach((a, i) => mono(a, lx + 14, lyy + 36 + i * 20, '#cdd8e0', 11, 'left'));
+    }
+  }
+
+  // ── Scene 10: sim auditor ──
+  function renderSimAuditor() {
+    // replay tape top
+    const ty = height * 0.10, tx0 = width * 0.14, tx1 = width * 0.86;
+    line(tx0, ty, tx1, ty, 'rgba(34,211,238,0.35)', 3);
+    for (let i = 0; i < 8; i++) {
+      const mx = tx0 + ((animTime * 0.06 + i / 8) % 1) * (tx1 - tx0);
+      ctx.save(); ctx.fillStyle = CY; ctx.shadowColor = CY; ctx.shadowBlur = 8;
+      ctx.fillRect(mx - 2, ty - 6, 4, 12); ctx.restore();
+    }
+    label('▶ replay-лента: любую находку можно переиграть', width / 2, ty - 22, CY, 12, 800);
+
+    // scan line sweep
+    customState.scanX = Math.min(1, (customState.scanX || 0) + 0.005);
+    const beam = tx0 + customState.scanX * (tx1 - tx0);
+    ctx.save();
+    ctx.strokeStyle = CY; ctx.lineWidth = 2; ctx.shadowColor = CY; ctx.shadowBlur = 12; ctx.globalAlpha = 0.7;
+    ctx.beginPath(); ctx.moveTo(beam, height * 0.16); ctx.lineTo(beam, height * 0.92); ctx.stroke();
+    ctx.restore();
+
+    // flag nodes as beam passes
+    const flagLabels = { 2: 'секрет открыт', 3: 'нет авторизации', 4: 'устаревшая связь' };
+    const flagged = customState.flagged || (customState.flagged = {});
+    customState.nodes.forEach((n, i) => {
+      if (flagLabels[i] && beam >= n.x && !flagged[i]) {
+        flagged[i] = true; addShockwave(n.x, n.y, RED, 70); addSparks(n.x, n.y, RED, 14, 4);
+      }
+    });
+
+    drawGraph({ flagged, flagLabels });
+
+    const cnt = Object.keys(flagged).length;
+    label('🔎 найдено проблем: ' + cnt, width * 0.5, height * 0.73, cnt ? RED : EM, 14, 800);
+  }
+
+  // ── Effects ──
+  function renderEffects() {
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const sw = shockwaves[i];
+      sw.radius += (sw.maxRadius - sw.radius) * 0.12; sw.life -= sw.decay;
+      if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
+      ctx.save(); ctx.strokeStyle = sw.color; ctx.globalAlpha = sw.life; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.x += sp.vx; sp.y += sp.vy; sp.life -= sp.decay;
+      if (sp.life <= 0) { sparks.splice(i, 1); continue; }
+      ctx.save(); ctx.fillStyle = sp.color; ctx.globalAlpha = sp.life; ctx.shadowColor = sp.color; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UI & STORY CONTROLLER
+  // ═══════════════════════════════════════════════════════════════════════════
+  const topNav = document.getElementById('top-nav');
+  const deckScroll = document.getElementById('deck-scroll');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  const btnPlay = document.getElementById('btn-play');
+  const btnRestart = document.getElementById('btn-restart');
+  const voiceToggle = document.getElementById('voice-toggle');
+  const progressBar = document.getElementById('progress-bar');
+  const slideCounter = document.getElementById('slide-counter');
+  const captionText = document.getElementById('stage-caption-text');
+  const sceneNote = document.getElementById('stage-scene-note');
+  const btnPresenter = document.getElementById('btn-presenter');
+
+  const storyNavBadges = [];
+  const slideViews = [];
+
+  const LEGENDS = {
+    home_lab:             [[EM, 'чтение — свободно'], [VIO, 'запись — через 🔒 человека'], [CY, 'агент / MCP']],
+    task_prompt:          [[CY, 'терминал агента'], [BLUE, 'роутер 192.168.1.1']],
+    recon_sweep:          [[EM, '80/443 · веб Boa'], [AMB, '22 · SSH (слабый)'], [MUT, 'порт закрыт']],
+    spa_reverse:          [[CY, 'JS-бандл'], [EM, 'GET чтение конфига'], [VIO, 'POST запись (🔒)']],
+    config_leak:          [[EM, 'ответ без авторизации'], [AMB, 'пароль в base64'], [RED, 'утечка → админ']],
+    auth_asymmetry:       [[EM, 'чтение 🔓 открыто'], [VIO, 'запись 🔒 закрыто'], [RED, 'цепочка захвата']],
+    cve_pipeline:         [[CY, 'отчёт в пути'], [EM, 'этап пройден'], [AMB, '≈ 3 часа']],
+    guardrail_framework:  [[EM, 'read — свободно'], [AMB, 'write — рука человека'], [VIO, 'секреты скрыты']],
+    sim_agent_guardrails: [[EM, 'агент читает узлы'], [AMB, 'запись — подтверждение ✋'], [BLUE, 'узел процесса']],
+    sim_auditor:          [[RED, 'найдена проблема'], [BLUE, 'узел чист'], [CY, 'replay-переигровка']]
+  };
+  const legendEl = document.getElementById('stage-legend');
+  const stageFade = document.getElementById('stage-fade');
+
+  function updateLegend(index) {
+    const rows = LEGENDS[slidesData[index].mode];
+    if (!rows) { legendEl.style.display = 'none'; return; }
+    legendEl.style.display = 'flex';
+    legendEl.innerHTML = '<div class="legend-title">Обозначения</div>' + rows.map(
+      ([c, l]) => `<div class="legend-item"><span class="legend-dot" style="background:${c};color:${c}"></span>${l}</div>`
+    ).join('');
+  }
+
+  function buildUI() {
+    slidesData.forEach((s, idx) => {
+      if (idx > 0) {
+        const sep = document.createElement('span');
+        sep.className = 'nav-sep'; sep.textContent = '→'; topNav.appendChild(sep);
+      }
+      const b = document.createElement('button');
+      b.className = 'nav-badge' + (idx === 0 ? ' active' : '');
+      b.innerHTML = `<span class="num">${idx + 1}</span><span>${s.storyLabel}</span>`;
+      b.onclick = () => goToSlide(idx, { forceSpeak: voiceToggle.checked });
+      topNav.appendChild(b);
+      storyNavBadges.push(b);
+
+      const slide = document.createElement('div');
+      slide.className = 'slide-view' + (idx === 0 ? ' active' : '');
+      slide.innerHTML = `
+        <div class="slide-tag-line" style="color: ${s.tagColor}">${s.icon} ${s.tag}</div>
+        <h1 class="slide-title">${s.title}</h1>
+        <div class="slide-desc">${s.desc}</div>
+        <div class="callout-box ${s.calloutClass}">${s.callout}</div>
+      `;
+      deckScroll.appendChild(slide);
+      slideViews.push(slide);
+    });
+    updateUI();
+  }
+
+  function goToSlide(index, options = {}) {
+    if (index < 0 || index >= slidesData.length) return;
+    currentSlide = index;
+    if (stageFade) { stageFade.style.transition = 'none'; stageFade.style.opacity = '1'; }
+    initScene(index);
+    updateUI();
+    updatePresenterWindow(index);
+    if (stageFade) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        stageFade.style.transition = 'opacity 0.45s ease'; stageFade.style.opacity = '0';
+      }));
+    }
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+
+    const shouldSpeak = voiceToggle.checked && options.forceSpeak;
+    if (shouldSpeak) speakSlide(index);
+    else { prefetch(index); prefetch(index + 1); }
+  }
+
+  function updateUI() {
+    btnPrev.disabled = currentSlide === 0;
+    btnNext.disabled = currentSlide === slidesData.length - 1;
+    slideCounter.textContent = `${currentSlide + 1} / ${slidesData.length}`;
+    captionText.textContent = slidesData[currentSlide].caption;
+    if (sceneNote) sceneNote.textContent = slidesData[currentSlide].sceneNote || '';
+    updateLegend(currentSlide);
+    slideViews.forEach((v, i) => v.classList.toggle('active', i === currentSlide));
+    storyNavBadges.forEach((b, i) => b.classList.toggle('active', i === currentSlide));
+    const activeBadge = storyNavBadges[currentSlide];
+    if (activeBadge) activeBadge.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUDIO & TTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  let isPlaying = false;
+  let ttsAudio = null;
+  const preloadPool = {};
+  const NARRATION_VERSION = 'routercve-10-20260831-v1';
+  voiceToggle.checked = false;
+
+  function ttsUrl(idx) {
+    const voice = localStorage.getItem('presentationVoiceChoice') || '';
+    return `narration/router_cve/${__voiceSlug(voice)}/${idx}.mp3?v=${NARRATION_VERSION}`;
+  }
+  function prefetch(idx) {
+    if (idx < 0 || idx >= slidesData.length || preloadPool[idx]) return;
+    const a = new Audio(ttsUrl(idx)); a.preload = 'auto'; preloadPool[idx] = a;
+  }
+  function speakSlide(idx) {
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = true; btnPlay.textContent = '⏸ Пауза';
+    const audio = preloadPool[idx] || new Audio(ttsUrl(idx));
+    delete preloadPool[idx]; audio.preload = 'auto'; ttsAudio = audio;
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration) progressBar.style.width = ((audio.currentTime / audio.duration) * 100) + '%';
+    });
+    audio.addEventListener('ended', () => {
+      isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+      if (currentSlide < slidesData.length - 1) goToSlide(currentSlide + 1, { forceSpeak: true });
+    });
+    audio.play().catch(() => { isPlaying = false; btnPlay.textContent = '▶ Играть'; });
+    prefetch(idx + 1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRESENTER WINDOW
+  // ═══════════════════════════════════════════════════════════════════════════
+  let presenterWindow = null;
+  let presenterRenderToken = 0;
+  function getPresenterDoc() { return (presenterWindow && !presenterWindow.closed) ? presenterWindow.document : null; }
+  function formatNarrationHtml(text) {
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sentences = (text.match(/[^.!?…]+[.!?…]+["»)]*\s*/g) || [text]).map(s => s.trim()).filter(Boolean);
+    const paras = [];
+    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(' '));
+    return paras.map(p => '<p>' + esc(p) + '</p>').join('') || esc(text);
+  }
+  function renderPresenter(index) {
+    const doc = getPresenterDoc();
+    if (!doc) return;
+    const d = slidesData[index];
+    const token = ++presenterRenderToken;
+    const dotsHtml = slidesData.map((s, i) =>
+      `<button class="p-dot${i === index ? ' active' : ''}" data-slide="${i}" style="--p-dot:${s.tagColor}"></button>`
+    ).join('');
+    doc.body.innerHTML = `
+      <header>
+        <div>
+          <div class="eyebrow">🖥 Пульт докладчика · ИИ-агент против роутера</div>
+          <div class="counter">Слайд ${index + 1} из ${slidesData.length}</div>
+        </div>
+        <button id="closeBtn" class="close" title="Закрыть пульт">✕</button>
+      </header>
+      <main class="notes">
+        <div class="pane-label">Точный текст озвучки &amp; Тезисы</div>
+        <div class="pv-tag" style="color:${d.tagColor}">${d.icon} ${d.tag}</div>
+        <h2>${d.title}</h2>
+        <div id="narrContent" class="pv-text">Загрузка текста озвучки…</div>
+        <div class="pv-callout">${d.callout}</div>
+        ${PRESENTER_TIPS[index] ? `<div class="pv-tip"><span class="pv-tip-label">🎛 Что на сцене</span>${PRESENTER_TIPS[index]}</div>` : ''}
+      </main>
+      <footer>
+        <button id="pPrevBtn" class="p-nav-btn" ${index === 0 ? 'disabled' : ''}>‹</button>
+        <div class="dots-wrap">${dotsHtml}</div>
+        <button id="pNextBtn" class="p-nav-btn" ${index === slidesData.length - 1 ? 'disabled' : ''}>›</button>
+      </footer>
+    `;
+    doc.getElementById('closeBtn').onclick = () => presenterWindow.close();
+    doc.getElementById('pPrevBtn').onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+    doc.getElementById('pNextBtn').onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+    doc.querySelectorAll('[data-slide]').forEach(b => {
+      b.onclick = () => goToSlide(Number(b.dataset.slide), { forceSpeak: voiceToggle.checked });
+    });
+    fetch(`narration/router_cve/${index}.json`)
+      .then(r => { if (!r.ok) throw new Error('error'); return r.json(); })
+      .then(p => {
+        if (token !== presenterRenderToken) return;
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = formatNarrationHtml(p.text);
+      })
+      .catch(() => {
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = `<p>${d.desc}</p>`;
+      });
+  }
+  function updatePresenterWindow(index) { if (getPresenterDoc()) renderPresenter(index); }
+
+  async function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); renderPresenter(currentSlide); return; }
+    if ('documentPictureInPicture' in window) {
+      try {
+        presenterWindow = await documentPictureInPicture.requestWindow({
+          width: Math.max(380, Math.min(540, Math.round(screen.availWidth * 0.26))),
+          height: Math.max(540, Math.round(screen.availHeight * 0.88)),
+          disallowReturnToOpener: true
+        });
+      } catch (e) { presenterWindow = null; }
+    }
+    if (!presenterWindow) presenterWindow = window.open('', 'router-cve-presenter', 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
+    if (!presenterWindow) { alert('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для пульта.'); return; }
+    presenterWindow.document.write(`<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Пульт докладчика — ИИ-агент против роутера</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: #061019; color: #bfd6e0; font-family: 'Inter', -apple-system, sans-serif; }
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #0a1a24; border-bottom: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .eyebrow { color: #22d3ee; font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .counter { margin-top: 4px; color: #7f97a6; font-size: 11px; font-weight: 700; }
+    .close { width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    .close:hover { background: rgba(34,211,238,.25); color: #fff; }
+    .notes { flex: 1; padding: 24px 22px 90px; overflow-y: auto; }
+    .pane-label { margin-bottom: 16px; color: #5f7686; font-size: 10px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    .pv-tag { font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    h2 { margin: 10px 0 18px; color: #eef7fb; font-size: 24px; line-height: 1.2; font-weight: 800; }
+    .pv-text { font-size: 16px; line-height: 1.65; color: #d4e6ef; }
+    .pv-text p { margin-bottom: 14px; }
+    .pv-text p:first-child { font-weight: 600; color: #f0f9ff; }
+    .pv-callout { margin-top: 18px; padding: 14px 16px; border-radius: 10px; background: rgba(34,211,238,.1); border-left: 4px solid #22d3ee; color: #cae8f0; font-size: 14px; line-height: 1.5; }
+    .pv-tip { margin-top: 14px; padding: 13px 15px; border-radius: 10px; background: rgba(16,185,129,.08); border: 1px dashed rgba(16,185,129,.4); color: #bdeed7; font-size: 13.5px; line-height: 1.55; }
+    .pv-tip b { color: #eafff5; font-weight: 700; }
+    .pv-tip-label { display: block; margin-bottom: 6px; color: #10b981; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #0a1a24; border-top: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .p-nav-btn { width: 36px; height: 36px; font-size: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .p-nav-btn:hover:not(:disabled) { border-color: #22d3ee; color: #fff; background: rgba(34,211,238,.2); }
+    .p-nav-btn:disabled { opacity: .25; cursor: default; }
+    .dots-wrap { flex: 1; display: flex; justify-content: center; gap: 6px; }
+    .p-dot { width: 8px; height: 8px; border-radius: 50%; border: 0; background: #2b3f4d; cursor: pointer; transition: all 0.2s; }
+    .p-dot.active { width: 22px; border-radius: 4px; background: var(--p-dot); box-shadow: 0 0 10px var(--p-dot); }
+  </style>
+</head>
+<body></body>
+</html>`);
+    presenterWindow.document.close();
+    presenterWindow.addEventListener('pagehide', () => { btnPresenter.textContent = '🖥 Пульт'; });
+    btnPresenter.textContent = '🖥 Пульт открыт';
+    renderPresenter(currentSlide);
+    presenterWindow.focus();
+  }
+
+  // ── Event Listeners ──
+  btnPrev.onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+  btnNext.onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+  btnRestart.onclick = () => goToSlide(0, { forceSpeak: voiceToggle.checked });
+  btnPresenter.onclick = openPresenter;
+  btnPlay.onclick = () => {
+    if (isPlaying && ttsAudio) { ttsAudio.pause(); isPlaying = false; btnPlay.textContent = '▶ Играть'; }
+    else if (!isPlaying && ttsAudio) { ttsAudio.play(); isPlaying = true; btnPlay.textContent = '⏸ Пауза'; }
+    else speakSlide(currentSlide);
+  };
+  voiceToggle.addEventListener('change', () => {
+    if (!voiceToggle.checked && ttsAudio) {
+      ttsAudio.pause(); ttsAudio = null; isPlaying = false;
+      btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); btnNext.click(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); btnPrev.click(); }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); openPresenter(); }
+  });
+
+  // ── Boot ──
+  resizeCanvas();
+  buildUI();
+  const hashSlide = parseInt((location.hash || '').replace('#', ''), 10);
+  const startIndex = Number.isInteger(hashSlide) && hashSlide >= 1 && hashSlide <= slidesData.length ? hashSlide - 1 : 0;
+  currentSlide = startIndex;
+  initScene(startIndex);
+  updateUI();
+  prefetch(startIndex);
+  prefetch(startIndex + 1);
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chemical Abstract Machine × Хлоропласты</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    #cham {
+      --bg: #08060f;
+      --panel: #120c22;
+      --border: rgba(168, 85, 247, 0.18);
+      --border2: rgba(255,255,255,0.08);
+      --text: #ece8f6;
+      --muted: #9d92b8;
+      --violet: #a855f7;
+      --magenta: #ec4899;
+      --cyan: #22d3ee;
+      --emerald: #00d46a;
+      --amber: #f59e0b;
+      --blue: #58a6ff;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      height: 100%; overflow: hidden; display: flex; flex-direction: column;
+    }
+    #cham .layout { display: flex; flex: 1; min-height: 0; }
+    /* Georgia is the last-resort fallback so the { } brace glyphs (missing in
+       Inter/JetBrains Mono) render properly via per-glyph font fallback. */
+    #cham .mono { font-family: 'JetBrains Mono', ui-monospace, Georgia, monospace; }
+
+    /* ── Story nav ── */
+    #cham .story-nav {
+      flex-shrink: 0; height: 48px; display: flex; align-items: center; gap: 7px;
+      padding: 7px 18px; overflow-x: auto; overflow-y: hidden;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, rgba(18,12,34,.98), rgba(10,7,20,.98));
+      scrollbar-width: thin; scrollbar-color: rgba(168,85,247,.3) transparent;
+    }
+    #cham .story-nav::-webkit-scrollbar { height: 3px; }
+    #cham .story-nav::-webkit-scrollbar-thumb { background: rgba(168,85,247,.3); border-radius: 3px; }
+    #cham .story-step {
+      flex: 0 0 auto; height: 31px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: rgba(255,255,255,.025);
+      color: #a99cc6; font-size: .68rem; font-weight: 700; white-space: nowrap; cursor: pointer;
+      transition: color .16s, border-color .16s, background .16s, transform .16s;
+    }
+    #cham .story-step:hover { color: #ddd3f2; border-color: rgba(168,85,247,.45); transform: translateY(-1px); }
+    #cham .story-step.active { color: #120522; background: var(--violet); border-color: var(--violet); box-shadow: 0 0 12px rgba(168,85,247,.3); }
+    #cham .story-index { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border-radius: 50%; background: rgba(255,255,255,.08); color: inherit; font-size: .58rem; }
+    #cham .story-step.active .story-index { background: rgba(0,0,0,.18); }
+    #cham .story-arrow { flex: 0 0 auto; color: rgba(168,85,247,.4); font-size: .72rem; }
+
+    /* ── Left panel ── */
+    #cham .left-panel {
+      width: 460px; flex-shrink: 0; border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      background: linear-gradient(180deg, #100a20 0%, #08060f 100%);
+    }
+    #cham .brand-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #cham .brand-left { display: flex; flex-direction: column; gap: 2px; }
+    #cham .brand-logo { font-weight: 800; font-size: 1rem; color: var(--violet); letter-spacing: -0.02em; }
+    #cham .brand-tag { font-size: 0.68rem; color: var(--muted); font-weight: 500; }
+    #cham .presenter-btn {
+      display: flex; align-items: center; gap: 5px; padding: 6px 11px; border: 1px solid var(--border);
+      border-radius: 8px; background: rgba(168,85,247,0.08); color: var(--violet);
+      font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.2s; white-space: nowrap;
+    }
+    #cham .presenter-btn:hover { background: rgba(168,85,247,0.2); border-color: var(--violet); }
+
+    #cham .slides-container { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; padding: 24px 30px; overflow-y: auto; min-height: 0; }
+    #cham .slides-container::-webkit-scrollbar { width: 4px; }
+    #cham .slides-container::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.22); border-radius: 2px; }
+    #cham .slide { display: none; animation: cm-fadeSlide 0.4s ease-out; }
+    #cham .slide.active { display: block; }
+    #cham .slide-tag { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+    #cham .slide-tag::before { content: ''; display: block; width: 20px; height: 2px; background: currentColor; border-radius: 1px; }
+    #cham .slide h1 { font-size: 1.74rem; font-weight: 900; margin-bottom: 16px; color: #fff; line-height: 1.16; letter-spacing: -0.035em; }
+    #cham .main-text { font-size: 1.02rem; line-height: 1.7; color: #cabfe0; }
+    #cham .main-text strong { color: #fff; }
+    #cham .main-text .k { color: var(--cyan); font-weight: 700; }
+    #cham .chip {
+      display: inline-block; margin: 1px 0; padding: 1px 7px; border-radius: 6px;
+      background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.25);
+      color: #bff0f7; font-weight: 700; font-family: 'JetBrains Mono', Georgia, monospace; font-size: 0.9em; white-space: nowrap;
+    }
+    #cham .thesis-box {
+      margin-top: 16px; padding: 14px 16px; background: rgba(168,85,247,0.08);
+      border: 1px solid rgba(168,85,247,0.24); border-left: 3px solid var(--violet);
+      border-radius: 0 10px 10px 0; font-size: 0.9rem; line-height: 1.6; color: #c8b9e6;
+    }
+    #cham .thesis-box.emerald { background: rgba(0,212,106,0.06); border-color: rgba(0,212,106,0.2); border-left-color: var(--emerald); color: #8fcdb2; }
+    #cham .thesis-box.cyan { background: rgba(34,211,238,0.06); border-color: rgba(34,211,238,0.2); border-left-color: var(--cyan); color: #9fd9e3; }
+    #cham .thesis-box.amber { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.2); border-left-color: var(--amber); color: #d4b880; }
+    #cham .thesis-box b, #cham .thesis-box strong { color: #fff; }
+    #cham .note-small { margin-top: 14px; font-size: 0.7rem; line-height: 1.5; color: #7c7096; }
+
+    /* ── Controls ── */
+    #cham .controls { display: flex; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border); gap: 6px; flex-wrap: nowrap; flex-shrink: 0; }
+    #cham .controls .progress { flex: 1; min-width: 24px; }
+    #cham .icon-btn { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border2); background: rgba(255,255,255,0.04); color: #a596c2; font-size: 13px; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+    #cham .icon-btn:hover:not(:disabled) { border-color: var(--violet); color: var(--violet); }
+    #cham .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    #cham .primary { height: 30px; padding: 0 13px; border-radius: 7px; border: none; background: var(--violet); color: #14051f; font-size: 0.77rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+    #cham .primary:hover:not(:disabled) { background: #9333ea; }
+    #cham .ghost { height: 30px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--border2); background: transparent; color: #a596c2; font-size: 0.75rem; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+    #cham .ghost:hover:not(:disabled) { border-color: var(--violet); color: var(--violet); }
+    #cham .ghost:disabled { opacity: 0.3; cursor: not-allowed; }
+    #cham .toggle { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border2); background: rgba(255,255,255,0.04); color: #a596c2; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; flex-shrink: 0; transition: all 0.15s; }
+    #cham .toggle input { position: absolute; opacity: 0; pointer-events: none; width: 0; }
+    #cham .toggle:hover { border-color: var(--violet); color: var(--violet); }
+    #cham .toggle input:checked + .voice-icon { color: var(--violet); filter: drop-shadow(0 0 4px var(--violet)); }
+    #cham .voice-icon { font-size: 14px; transition: all 0.2s; }
+    #cham .progress { height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin: 0 3px; }
+    #cham .bar { height: 100%; width: 0; background: linear-gradient(to right, var(--violet), var(--cyan)); transition: width 0.25s; }
+    #cham .slide-counter { font-size: 0.72rem; color: #8c7fab; white-space: nowrap; flex-shrink: 0; font-weight: 700; }
+    #cham .slide-dots-bar { display: flex; gap: 5px; padding: 6px 14px; justify-content: center; border-top: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; }
+    #cham .dot { width: 6px; height: 6px; border-radius: 50%; border: none; background: rgba(255,255,255,0.14); cursor: pointer; transition: all 0.3s; padding: 0; }
+    #cham .dot.active { width: 20px; border-radius: 3px; }
+
+    /* ════════════════════════════════════════════════════════════════════
+       RIGHT PANEL — a purpose-built diagram per slide (no canvas)
+    ════════════════════════════════════════════════════════════════════ */
+    #cham .right-panel { flex: 1; position: relative; overflow: hidden; background: radial-gradient(ellipse at 55% 45%, #160c2c 0%, #08060f 70%); }
+    #cham .stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 48px 56px 74px; }
+    #cham .scene { width: 100%; max-width: 660px; animation: cm-sceneIn 0.5s ease-out; }
+    #cham .stage-caption {
+      position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 8px; padding: 7px 18px; border-radius: 20px;
+      background: rgba(8,6,15,0.9); border: 1px solid rgba(168,85,247,0.35); backdrop-filter: blur(8px);
+      font-size: 0.78rem; font-weight: 700; color: #ddd0f2; white-space: nowrap; max-width: calc(100% - 48px); overflow: hidden; text-overflow: ellipsis;
+    }
+    #cham .stage-caption::before { content: '▸'; color: var(--violet); }
+
+    /* Molecule chip — shared building block */
+    #cham .mol { display: inline-flex; align-items: center; gap: 9px; padding: 9px 16px 9px 9px; border-radius: 999px; background: rgba(255,255,255,0.05); border: 1.5px solid var(--border2); box-shadow: 0 4px 18px rgba(0,0,0,.35); }
+    #cham .mol .head { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 14px; color: #0b0416; font-family: 'JetBrains Mono', monospace; }
+    #cham .mol .body { font-weight: 800; font-size: 19px; color: #f2eefb; font-family: 'JetBrains Mono', monospace; }
+    #cham .mol.a { border-color: rgba(34,211,238,0.55); } #cham .mol.a .head { background: var(--cyan); box-shadow: 0 0 14px rgba(34,211,238,.5); }
+    #cham .mol.abar { border-color: rgba(236,72,153,0.55); } #cham .mol.abar .head { background: var(--magenta); box-shadow: 0 0 14px rgba(236,72,153,.5); }
+    #cham .mol.inert { border-color: rgba(148,163,184,0.4); background: rgba(148,163,184,0.08); }
+    #cham .mol.inert .head { display: none; }
+    #cham .mol.inert .body { color: #c3cad6; }
+    #cham .mol.big { padding: 13px 22px 13px 13px; }
+    #cham .mol.big .head { width: 34px; height: 34px; font-size: 16px; }
+    #cham .mol.big .body { font-size: 24px; }
+
+    /* legend */
+    #cham .scene-legend { display: flex; justify-content: center; gap: 18px; margin-top: 22px; flex-wrap: wrap; }
+    #cham .lg { display: flex; align-items: center; gap: 7px; font-size: 0.72rem; color: var(--muted); }
+    #cham .lg i { width: 13px; height: 13px; border-radius: 50%; display: inline-block; }
+    #cham .lg .ca { background: var(--cyan); } #cham .lg .cb { background: var(--magenta); } #cham .lg .cc { background: #94a3b8; }
+
+    /* ── Scene: bridge (title) ── */
+    #cham .bridge { display: flex; flex-direction: column; align-items: center; gap: 0; }
+    #cham .dom { width: 340px; display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 16px; background: rgba(255,255,255,0.035); border: 1px solid var(--border2); }
+    #cham .dom .ic { font-size: 30px; width: 46px; text-align: center; }
+    #cham .dom .t { font-weight: 800; font-size: 1.05rem; color: #fff; }
+    #cham .dom .s { font-size: 0.78rem; color: var(--muted); }
+    #cham .dom.cell { border-color: rgba(0,212,106,0.4); box-shadow: 0 0 24px rgba(0,212,106,.08); }
+    #cham .dom.cham { border-color: rgba(168,85,247,0.5); box-shadow: 0 0 24px rgba(168,85,247,.12); }
+    #cham .dom.graph { border-color: rgba(88,166,255,0.45); box-shadow: 0 0 24px rgba(88,166,255,.08); }
+    #cham .bridge .down { font-size: 22px; color: rgba(168,85,247,.7); margin: 7px 0; animation: cm-bob 1.8s ease-in-out infinite; }
+    #cham .thesis-badge { margin-top: 22px; padding: 14px 30px; border-radius: 14px; font-weight: 900; font-size: 1.5rem; letter-spacing: -0.01em; color: #fff; background: linear-gradient(90deg, rgba(168,85,247,.22), rgba(34,211,238,.18)); border: 1px solid rgba(168,85,247,.5); text-align: center; }
+    #cham .thesis-badge span { color: var(--cyan); }
+
+    /* ── Scene: emergence ── */
+    #cham .emg { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    #cham .emg-rules { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 560px; }
+    #cham .rulechip { padding: 9px 14px; border-radius: 11px; background: rgba(255,255,255,0.04); border: 1px dashed rgba(168,85,247,.4); font-size: 0.76rem; color: #c8b9e6; font-weight: 600; }
+    #cham .emg-no { display: flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 999px; border: 1px solid rgba(236,72,153,.4); color: #f0a8cd; font-size: 0.8rem; font-weight: 700; }
+    #cham .emg-no s { opacity: .8; }
+    #cham .emg-arrow { font-size: 26px; color: rgba(0,212,106,.75); animation: cm-bob 1.8s ease-in-out infinite; }
+    #cham .lattice { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; padding: 22px 26px; border-radius: 16px; border: 1px solid rgba(0,212,106,.35); background: rgba(0,212,106,.05); }
+    #cham .lattice i { width: 16px; height: 16px; border-radius: 50%; background: var(--emerald); box-shadow: 0 0 10px rgba(0,212,106,.55); animation: cm-pulse 2.4s ease-in-out infinite; }
+    #cham .emg-cap { font-size: 0.82rem; color: #8fcdb2; font-weight: 700; }
+
+    /* ── Scene: solution (beaker) ── */
+    #cham .beaker { position: relative; height: 380px; border-radius: 26px; border: 1.5px solid rgba(168,85,247,.4); background: linear-gradient(180deg, rgba(168,85,247,.05), rgba(34,211,238,.04)); box-shadow: inset 0 0 60px rgba(168,85,247,.08); overflow: hidden; }
+    #cham .beaker-label { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 0.7rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: rgba(210,190,245,.75); font-family: 'Inter', Georgia, sans-serif; }
+    #cham .beaker .mol { position: absolute; }
+    #cham .float0 { animation: cm-float0 7s ease-in-out infinite; } #cham .float1 { animation: cm-float1 8.5s ease-in-out infinite; }
+    #cham .float2 { animation: cm-float2 9s ease-in-out infinite; } #cham .float3 { animation: cm-float3 7.8s ease-in-out infinite; }
+    #cham .float4 { animation: cm-float0 8.2s ease-in-out infinite reverse; } #cham .float5 { animation: cm-float2 9.4s ease-in-out infinite reverse; }
+
+    /* ── Scene: sieve ── */
+    #cham .sieve-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    #cham .brace { font-size: 190px; font-weight: 200; color: rgba(34,211,238,.5); font-family: Georgia, serif; line-height: 0.7; }
+    #cham .sieve { display: grid; grid-template-columns: repeat(6, 52px); gap: 9px; }
+    #cham .num { height: 46px; border-radius: 11px; display: grid; place-items: center; font-weight: 800; font-size: 1.05rem; font-family: 'JetBrains Mono', monospace; background: rgba(255,255,255,0.05); border: 1px solid var(--border2); color: #cabfe0; transition: all 0.4s; }
+    #cham .num.struck { opacity: 0.22; color: #6b6483; text-decoration: line-through; border-color: transparent; background: transparent; transform: scale(0.86); }
+    #cham .num.prime { background: rgba(0,212,106,.14); border-color: rgba(0,212,106,.6); color: #7ff0b5; box-shadow: 0 0 14px rgba(0,212,106,.3); }
+
+    /* ── Scene: reaction ── */
+    #cham .rxn { display: flex; flex-direction: column; align-items: center; gap: 30px; }
+    #cham .rxn-rule { font-family: 'JetBrains Mono', Georgia, monospace; font-size: 1.15rem; font-weight: 800; color: #d9cff0; letter-spacing: .01em; }
+    #cham .rxn-rule .hl-a { color: var(--cyan); } #cham .rxn-rule .hl-b { color: var(--magenta); } #cham .rxn-rule .hl-r { color: #7ff0b5; }
+    #cham .theater { position: relative; width: 420px; height: 150px; }
+    #cham .theater .mol { position: absolute; top: 50%; transform: translateY(-50%); }
+    #cham .react-l { left: 0; animation: cm-reactL 4s ease-in-out infinite; }
+    #cham .react-r { right: 0; animation: cm-reactR 4s ease-in-out infinite; }
+    #cham .spark { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%) scale(0); font-size: 40px; animation: cm-spark 4s ease-in-out infinite; }
+    #cham .res { position: absolute; top: 50%; opacity: 0; }
+    #cham .res-p { left: 50%; margin-left: -110px; animation: cm-resL 4s ease-in-out infinite; }
+    #cham .res-q { left: 50%; margin-left: 40px; animation: cm-resR 4s ease-in-out infinite; }
+
+    /* ── Scene: heat/cool ── */
+    #cham .hc { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+    #cham .tower { position: relative; width: 150px; height: 210px; }
+    #cham .layer { position: absolute; left: 0; right: 0; height: 60px; border-radius: 14px; display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 1.4rem; color: #0b0416; }
+    #cham .layer.l-a { top: 0; background: var(--cyan); z-index: 3; animation: cm-peel 4.5s ease-in-out infinite; }
+    #cham .layer.l-b { top: 75px; background: var(--magenta); z-index: 2; }
+    #cham .layer.l-p { top: 150px; background: #94a3b8; color: #14202e; z-index: 1; }
+    #cham .hc-eq { font-family: 'JetBrains Mono', Georgia, monospace; font-size: 1.05rem; font-weight: 800; color: #d9cff0; }
+    #cham .hc-eq .warm { color: var(--amber); }
+    #cham .hc-legend { display: flex; gap: 26px; font-size: 0.8rem; color: var(--muted); }
+    #cham .hc-legend b { color: var(--amber); }
+
+    /* ── Scene: membrane ── */
+    #cham .mem { display: flex; justify-content: center; }
+    #cham .mem-box { position: relative; width: 440px; padding: 40px 28px 30px; border-radius: 22px; border: 2px dashed rgba(168,85,247,.65); background: rgba(168,85,247,.08); }
+    #cham .mem-title { position: absolute; top: -13px; left: 22px; padding: 3px 12px; border-radius: 8px; background: #140b26; border: 1px solid rgba(168,85,247,.5); font-family: 'JetBrains Mono', Georgia, monospace; font-weight: 800; font-size: 0.85rem; color: #d9cff0; }
+    #cham .mem-mols { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+    #cham .airlock { position: absolute; right: -78px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    #cham .airlock .port { position: absolute; right: 118px; top: 50%; transform: translateY(-50%); width: 26px; height: 46px; border: 2px solid rgba(168,85,247,.7); border-left: none; border-radius: 0 10px 10px 0; }
+    #cham .airlock .al-arrow { position: absolute; right: 86px; top: 50%; transform: translateY(-50%); color: var(--violet); font-size: 20px; animation: cm-slideR 2s ease-in-out infinite; }
+    #cham .airlock .al-label { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #d9cff0; font-weight: 800; }
+
+    /* ── Scene: order (split) ── */
+    #cham .split { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px; }
+    #cham .col { padding: 20px 16px; border-radius: 16px; border: 1px solid var(--border2); background: rgba(255,255,255,0.03); display: flex; flex-direction: column; align-items: center; gap: 14px; min-height: 280px; justify-content: center; }
+    #cham .col.par { border-color: rgba(34,211,238,.4); }
+    #cham .col.seq { border-color: rgba(168,85,247,.5); }
+    #cham .col-h { font-weight: 800; font-size: 0.9rem; color: #fff; text-align: center; }
+    #cham .col-h small { display: block; font-family: 'JetBrains Mono', Georgia, monospace; font-size: 0.78rem; color: var(--muted); font-weight: 700; margin-top: 3px; }
+    #cham .bag { position: relative; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 8px 20px; }
+    #cham .bag::before, #cham .bag::after { position: absolute; top: 50%; transform: translateY(-50%); font-size: 90px; font-weight: 200; color: rgba(34,211,238,.45); font-family: Georgia, serif; }
+    #cham .bag::before { content: '{'; left: -6px; } #cham .bag::after { content: '}'; right: -6px; }
+    #cham .bag .mol { animation: cm-jitter 3s ease-in-out infinite; }
+    #cham .bag .mol:nth-child(2) { animation-delay: .6s; } #cham .bag .mol:nth-child(3) { animation-delay: 1.2s; }
+    #cham .chain { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    #cham .chain-node { display: flex; align-items: center; gap: 10px; }
+    #cham .chain-node .step { width: 22px; height: 22px; border-radius: 50%; background: rgba(168,85,247,.25); border: 1px solid var(--violet); display: grid; place-items: center; font-size: 0.7rem; font-weight: 800; color: #e3d6f7; }
+    #cham .chain-arrow { color: rgba(168,85,247,.7); font-size: 16px; }
+    #cham .col-b { font-size: 0.76rem; color: var(--muted); text-align: center; }
+    #cham .col.par .col-b { color: #9fd9e3; } #cham .col.seq .col-b { color: #c8b9e6; }
+    #cham .vs { font-weight: 900; color: #6b6483; font-size: 0.85rem; }
+
+    /* ── Scene: graph ── */
+    #cham .graph-scene { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+    #cham .graph-svg { width: 460px; height: 300px; }
+    #cham .g-node { fill: rgba(88,166,255,.16); stroke: var(--blue); stroke-width: 2; }
+    #cham .g-node.hub { fill: rgba(168,85,247,.2); stroke: var(--violet); }
+    #cham .g-label { fill: #eaf1ff; font: 800 15px 'Inter', sans-serif; text-anchor: middle; }
+    #cham .g-sub { fill: #9db4d6; font: 600 11px 'Inter', sans-serif; text-anchor: middle; }
+    #cham .g-edge { stroke: rgba(88,166,255,.4); stroke-width: 2.5; }
+    #cham .g-token { fill: var(--amber); filter: drop-shadow(0 0 6px var(--amber)); }
+    #cham .g-token.e1 { animation: cm-tok1 2.6s ease-in-out infinite; }
+    #cham .g-token.e2 { animation: cm-tok2 2.6s ease-in-out infinite; animation-delay: .5s; }
+    #cham .g-map { display: flex; gap: 22px; font-size: 0.78rem; color: var(--muted); }
+    #cham .g-map b { color: var(--blue); }
+
+    /* ── Scene: summary ── */
+    #cham .summary { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    #cham .sum-cards { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 460px; }
+    #cham .sum-card { display: flex; align-items: center; gap: 14px; padding: 13px 18px; border-radius: 13px; background: rgba(255,255,255,0.035); border: 1px solid var(--border2); }
+    #cham .sum-card .ic { font-size: 24px; width: 34px; text-align: center; }
+    #cham .sum-card .t { font-weight: 800; color: #fff; font-size: 0.95rem; }
+    #cham .sum-card .s { font-size: 0.76rem; color: var(--muted); }
+    #cham .sum-card.cell { border-left: 3px solid var(--emerald); }
+    #cham .sum-card.cham { border-left: 3px solid var(--violet); }
+    #cham .sum-card.graph { border-left: 3px solid var(--blue); }
+
+    /* ── Keyframes ── */
+    @keyframes cm-fadeSlide { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes cm-sceneIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+    @keyframes cm-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+    @keyframes cm-pulse { 0%,100% { opacity: .55; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.1); } }
+    @keyframes cm-float0 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(18px,-22px); } }
+    @keyframes cm-float1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-20px,16px); } }
+    @keyframes cm-float2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-16px,-18px); } }
+    @keyframes cm-float3 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(22px,14px); } }
+    @keyframes cm-jitter { 0%,100% { transform: translate(0,0) rotate(0); } 25% { transform: translate(4px,-3px) rotate(2deg); } 75% { transform: translate(-3px,3px) rotate(-2deg); } }
+    @keyframes cm-reactL { 0% { left: 0; opacity: 1; } 38% { left: calc(50% - 130px); opacity: 1; } 48% { left: calc(50% - 130px); opacity: 0; } 49%,100% { opacity: 0; } }
+    @keyframes cm-reactR { 0% { right: 0; opacity: 1; } 38% { right: calc(50% - 130px); opacity: 1; } 48% { right: calc(50% - 130px); opacity: 0; } 49%,100% { opacity: 0; } }
+    @keyframes cm-spark { 0%,40% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 47% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; } 56% { transform: translate(-50%,-50%) scale(0.6); opacity: 0; } 100% { opacity: 0; } }
+    @keyframes cm-resL { 0%,52% { opacity: 0; margin-left: -40px; } 62% { opacity: 1; margin-left: -110px; } 90% { opacity: 1; margin-left: -110px; } 100% { opacity: 0; } }
+    @keyframes cm-resR { 0%,52% { opacity: 0; margin-left: -30px; } 62% { opacity: 1; margin-left: 40px; } 90% { opacity: 1; margin-left: 40px; } 100% { opacity: 0; } }
+    @keyframes cm-peel { 0%,20% { top: 0; transform: rotate(0); } 45% { top: -70px; transform: translateX(90px) rotate(8deg); } 70% { top: -70px; transform: translateX(90px) rotate(8deg); } 92%,100% { top: 0; transform: rotate(0); } }
+    @keyframes cm-slideR { 0%,100% { transform: translate(0,-50%); opacity: .5; } 50% { transform: translate(8px,-50%); opacity: 1; } }
+    @keyframes cm-tok1 { 0% { transform: translate(0,0); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translate(232px,-78px); opacity: 0; } }
+    @keyframes cm-tok2 { 0% { transform: translate(0,0); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translate(232px,78px); opacity: 0; } }
+  </style>
+</head>
+<body>
+  <div id="cham">
+    <nav class="story-nav" id="cm-story-nav" aria-label="Путь презентации"></nav>
+    <div class="layout">
+      <div class="left-panel">
+        <div class="brand-bar">
+          <div class="brand-left">
+            <div class="brand-logo">⚗️ Chemical Abstract Machine</div>
+            <div class="brand-tag">Berry &amp; Boudol 1992 · мост к «Танцу хлоропластов»</div>
+          </div>
+          <button class="presenter-btn" id="cm-presenter-btn" title="Открыть пульт докладчика в отдельном окне">🖥 Пульт докладчика</button>
+        </div>
+        <div class="slides-container" id="cm-slides-container"></div>
+        <div class="controls">
+          <button id="cm-prev-btn" class="icon-btn" aria-label="Назад" disabled>‹</button>
+          <button id="cm-play-btn" class="primary">▶ Играть</button>
+          <button id="cm-restart-btn" class="ghost">↺</button>
+          <div class="progress"><div class="bar" id="cm-progress-bar"></div></div>
+          <span id="cm-slide-counter" class="slide-counter">1 / 10</span>
+          <label class="toggle" title="Голос" aria-label="Голос">
+            <input id="cm-voice-toggle" type="checkbox" checked>
+            <span class="voice-icon">🗣️</span>
+          </label>
+          <select id="vpick-select" title="Голос докладчика" aria-label="Голос докладчика" style="height:32px;border:1px solid #30363d;border-radius:7px;background:#0d1117;color:#c9d1d9;padding:0 8px;font:inherit;font-size:.8rem;cursor:pointer;max-width:160px;">
+            <option value="edge:ru-RU-DmitryNeural">🤖 Стандартный</option>
+            <option value="elevenlabs:mine">🎙 Мой голос</option>
+          </select>
+          <script>window.__voiceSlug=function(v){v=String(v||'');return v.indexOf('elevenlabs')===0?'mine':'edge';};</script>
+<script>(function(){var K='presentationVoiceChoice',D='elevenlabs:mine',s=document.getElementById('vpick-select');var v=localStorage.getItem(K);if(!v){v=D;localStorage.setItem(K,D);}s.value=[].some.call(s.options,function(o){return o.value===v})?v:D;s.addEventListener('change',function(){localStorage.setItem(K,s.value||D);});})();</script>
+          <button id="cm-next-btn" class="ghost">Далее ›</button>
+        </div>
+        <div class="slide-dots-bar" id="cm-slide-dots"></div>
+      </div>
+      <div class="right-panel">
+        <div class="stage" id="cm-stage"></div>
+        <div class="stage-caption" id="cm-caption"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function() {
+  // ── Slides: text (left) + scene kind (right) ────────────────────────────
+  const V = '#a855f7', MAG = '#ec4899', CY = '#22d3ee', EM = '#00d46a', AMB = '#f59e0b', BLUE = '#58a6ff';
+  const slidesData = [
+    {
+      icon: '🧭', tag: 'Мост', tagColor: V, storyLabel: 'Мост', kind: 'bridge',
+      caption: 'один принцип: клетка → CHAM → граф',
+      title: 'От танца хлоропластов — к «химической» машине',
+      html: `<div class="main-text">В прошлой презентации клетка находила порядок <strong>сама, без дирижёра</strong>. <strong>CHAM</strong> (Берри и Будоль, 1992) — строгая модель того же самого: вычисление как <span class="k">химические реакции в растворе</span>.</div>
+      <div class="thesis-box"><b>Тезис всей презентации:</b> структура = порядок. Порядок вычисления не навязан сверху — он и есть структура молекул и мембран.</div>
+      <div class="note-small">Проверил обе ссылки: <b>sciencedirect …0304-3975(92)90185-I</b> и <b>lix.polytechnique …cham.pdf</b> — это одна и та же работа Berry &amp; Boudol. Источник один.</div>`
+    },
+    {
+      icon: '🌀', tag: 'Эмерджентность', tagColor: EM, storyLabel: 'Эмерджентность', kind: 'emergence',
+      caption: 'локальные правила → порядок · без центра',
+      title: 'Порядок без управляющего',
+      html: `<div class="main-text">Простые <strong>локальные правила</strong> рождают сложный глобальный порядок — и никто не командует из центра.</div>
+      <div class="thesis-box emerald">CHAM записывает это строго: вместо органелл — <strong>молекулы</strong>, вместо физики — <strong>правила реакций</strong>.</div>`
+    },
+    {
+      icon: '⚗️', tag: 'Модель', tagColor: V, storyLabel: 'Что такое CHAM', kind: 'solution',
+      caption: 'молекулы плавают · реагируют при встрече',
+      title: 'Состояние — это «химический раствор»',
+      html: `<div class="main-text">Состояние системы — <strong>раствор</strong> с плавающими <strong>молекулами</strong>. Они реагируют <span class="k">при встрече</span> по локальным правилам.</div>
+      <div class="thesis-box cyan">Реакции идут <strong>параллельно</strong>: сколько угодно сразу, лишь бы затрагивали разные молекулы. Единого счётчика команд нет.</div>`
+    },
+    {
+      icon: '{ }', tag: 'Ядро идеи', tagColor: CY, storyLabel: 'Мультимножество', kind: 'sieve',
+      caption: 'решето: правило «удаляй кратные» → простые',
+      title: 'Раствор — это мультимножество',
+      html: `<div class="main-text">Раствор — это <strong>мультимножество</strong> <span class="chip">{ … }</span>: порядок молекул не важен, <span class="chip">P|Q = Q|P</span>.</div>
+      <div class="thesis-box cyan">Пример справа: числа 2…n и одно правило — «каждое число удаляет своих кратных». Без всякого управляющего сами остаются <strong>простые числа</strong>. Порядок возник из локальных реакций.</div>`
+    },
+    {
+      icon: '🤝', tag: 'Реакция', tagColor: MAG, storyLabel: 'Реакции и ионы', kind: 'reaction',
+      caption: 'a·P + ā·Q → P, Q · рукопожатие валентностей',
+      title: 'Реакция = рукопожатие валентностей',
+      html: `<div class="main-text"><strong>Ион</strong> несёт <em>валентность</em> — предложение действия. <span class="chip">a·P</span> предлагает <em>a</em>, встречный <span class="chip">ā·Q</span> — противоположное <em>ā</em>.</div>
+      <div class="thesis-box">Они встречаются, действия <strong>a</strong> и <strong>ā</strong> гасят друг друга (рукопожатие), а тела <strong>P</strong> и <strong>Q</strong> освобождаются. Это акт коммуникации — как в CCS.</div>`
+    },
+    {
+      icon: '🌡', tag: 'Структурные правила', tagColor: AMB, storyLabel: 'Heating / Cooling', kind: 'heatcool',
+      caption: 'нагрев ⇀ дробит на ионы · охлаждение ↽ собирает',
+      title: 'Нагрев и охлаждение',
+      html: `<div class="main-text">Чтобы ион освободился, молекулу <strong>нагревают</strong> — дробят на части; <strong>охлаждают</strong> — собирают обратно.</div>
+      <div class="thesis-box amber">Это <strong>обратимо</strong> (<span class="chip">⇌</span>) и ничего не вычисляет — только меняет <strong>структуру</strong>, выставляя реагентов к встрече.</div>`
+    },
+    {
+      icon: '🫧', tag: 'Иерархия', tagColor: V, storyLabel: 'Мембраны и airlock', kind: 'membrane',
+      caption: 'мембрана {S} = подсистема · airlock = шлюз наружу',
+      title: 'Мембраны и airlock',
+      html: `<div class="main-text">Молекула может держать внутри <strong>целый подраствор</strong> — <span class="chip">{ S }</span> — это инкапсуляция и иерархия.</div>
+      <div class="thesis-box">Наружу молекулу выпускает шлюз <strong>airlock</strong> <span class="chip">m ◁ S</span> — контролируемая связь. Всё держат три закона: <b>Reaction</b>, <b>Chemical</b>, <b>Membrane</b>.</div>`
+    },
+    {
+      icon: '🎯', tag: 'Углубление вывода', tagColor: CY, storyLabel: 'Структура = порядок', kind: 'order',
+      caption: 'одни элементы — разный порядок из разной структуры',
+      title: 'Структура = порядок',
+      html: `<div class="main-text">Слева <strong>параллельно</strong> (мультимножество) — порядка нет. Справа <strong>последовательно</strong> (префикс <span class="chip">a·b·c</span>) — порядок задан структурой.</div>
+      <div class="thesis-box cyan">Одни и те же элементы дают <strong>разный порядок из разной структуры</strong>. Значит порядок не навязан сверху — он и есть структура. То же в клетке: <strong>геометрия = поведение</strong>.</div>`
+    },
+    {
+      icon: '⬡', tag: 'Применение', tagColor: BLUE, storyLabel: 'В simulator', kind: 'graph',
+      caption: 'акторы = молекулы · событие = реакция',
+      title: 'От раствора — к графам simulator',
+      html: `<div class="main-text">Наш граф — тот же раствор: <strong>акторы</strong> вместо молекул, <strong>событие</strong> вместо реакции. Топология = порядок; глобального шедулера нет.</div>
+      <div class="thesis-box" style="border-left-color:#58a6ff;background:rgba(88,166,255,0.07);border-color:rgba(88,166,255,0.22);color:#a9c8ec">Мембрана = подпроцесс. Heating / cooling = <strong>backpressure</strong> и ребаланс топологии под нагрузкой.</div>`
+    },
+    {
+      icon: '✅', tag: 'Вывод', tagColor: EM, storyLabel: 'Вывод', kind: 'summary',
+      caption: 'структура = порядок · для всех трёх систем',
+      title: 'Один принцип на три системы',
+      html: `<div class="main-text">Клетка, CHAM и наши графы — <strong>один принцип</strong>: локальные участники + структура → глобальный порядок, без дирижёра.</div>
+      <div class="thesis-box"><b>Структура = порядок.</b> Хочешь изменить поведение — меняй структуру, а не добавляй управляющего. Параллельность по умолчанию; порядок — там, где мы его построили.</div>`
+    }
+  ];
+
+  const NARRATION_VERSION = 'cham-10-20260817-v2';
+
+  // ── Scene builders (right panel) ────────────────────────────────────────
+  const mol = (head, body, cls) =>
+    '<div class="mol ' + (cls || '') + '">' + (head ? '<span class="head">' + head + '</span>' : '') + '<span class="body">' + body + '</span></div>';
+
+  const SCENES = {
+    bridge: () => `<div class="scene bridge">
+      <div class="dom cell"><div class="ic">🌿</div><div><div class="t">Клетка</div><div class="s">порядок из локальных сил</div></div></div>
+      <div class="down">↓</div>
+      <div class="dom cham"><div class="ic">⚗️</div><div><div class="t">CHAM</div><div class="s">реакции молекул в растворе</div></div></div>
+      <div class="down">↓</div>
+      <div class="dom graph"><div class="ic">⬡</div><div><div class="t">Граф simulator</div><div class="s">события между акторами</div></div></div>
+      <div class="thesis-badge">структура <span>=</span> порядок</div>
+    </div>`,
+
+    emergence: () => `<div class="scene emg">
+      <div class="emg-rules">
+        <div class="rulechip">держи дистанцию от соседа</div>
+        <div class="rulechip">двигайся к свету</div>
+        <div class="rulechip">повторяй за ближними</div>
+      </div>
+      <div class="emg-no"><s>🎼 дирижёр</s> — его нет</div>
+      <div class="emg-arrow">↓</div>
+      <div class="lattice">${Array.from({length: 21}, () => '<i></i>').join('')}</div>
+      <div class="emg-cap">✦ глобальная структура собралась сама</div>
+    </div>`,
+
+    solution: () => `<div class="scene">
+      <div class="beaker">
+        <div class="beaker-label">раствор { … }</div>
+        <div class="mol a float0" style="left:16%;top:22%">${''}<span class="head">a</span><span class="body">P</span></div>
+        <div class="mol abar float1" style="left:58%;top:16%"><span class="head">ā</span><span class="body">Q</span></div>
+        <div class="mol a float2" style="left:64%;top:56%"><span class="head">a</span><span class="body">R</span></div>
+        <div class="mol inert float3" style="left:20%;top:62%"><span class="body">p</span></div>
+        <div class="mol abar float4" style="left:38%;top:40%"><span class="head">ā</span><span class="body">S</span></div>
+        <div class="mol inert float5" style="left:74%;top:80%"><span class="body">q</span></div>
+      </div>
+      <div class="scene-legend">
+        <span class="lg"><i class="ca"></i>ион, валентность a</span>
+        <span class="lg"><i class="cb"></i>ион, валентность ā</span>
+        <span class="lg"><i class="cc"></i>инертное тело</span>
+      </div>
+    </div>`,
+
+    sieve: () => {
+      let tiles = '';
+      for (let n = 2; n <= 31; n++) tiles += '<div class="num" data-n="' + n + '">' + n + '</div>';
+      return `<div class="scene">
+        <div class="sieve-wrap"><div class="brace">{</div><div class="sieve" id="cm-sieve">${tiles}</div><div class="brace">}</div></div>
+        <div class="scene-legend"><span class="lg"><i style="background:#00d46a"></i>простое (осталось)</span><span class="lg"><i style="background:#6b6483"></i>кратное (удалено правилом)</span></div>
+      </div>`;
+    },
+
+    reaction: () => `<div class="scene rxn">
+      <div class="rxn-rule mono">{ <span class="hl-a">a·P</span> , <span class="hl-b">ā·Q</span> } → { <span class="hl-r">P</span> , <span class="hl-r">Q</span> }</div>
+      <div class="theater">
+        <div class="mol a big react-l"><span class="head">a</span><span class="body">P</span></div>
+        <div class="mol abar big react-r"><span class="head">ā</span><span class="body">Q</span></div>
+        <div class="spark">✦</div>
+        <div class="mol inert big res res-p"><span class="body">P</span></div>
+        <div class="mol inert big res res-q"><span class="body">Q</span></div>
+      </div>
+    </div>`,
+
+    heatcool: () => `<div class="scene hc">
+      <div class="tower">
+        <div class="layer l-a">a</div>
+        <div class="layer l-b">b</div>
+        <div class="layer l-p">P</div>
+      </div>
+      <div class="hc-eq mono">a·b·P <span class="warm">⇌</span> a , b·P</div>
+      <div class="hc-legend"><span><b>нагрев ⇀</b> дробит на ионы</span><span><b>охлаждение ↽</b> собирает</span></div>
+    </div>`,
+
+    membrane: () => `<div class="scene mem">
+      <div class="mem-box">
+        <div class="mem-title mono">{ S } подраствор</div>
+        <div class="mem-mols">
+          ${mol('a', 'P', 'a')}${mol('ā', 'Q', 'abar')}${mol('', 'r', 'inert')}
+        </div>
+        <div class="airlock">
+          <div class="port"></div>
+          <div class="al-arrow">→</div>
+          ${mol('a', 'm', 'a big')}
+          <div class="al-label mono">m ◁ S</div>
+        </div>
+      </div>
+    </div>`,
+
+    order: () => `<div class="scene split">
+      <div class="col par">
+        <div class="col-h">Параллельно<small>{ a , b , c }</small></div>
+        <div class="bag">${mol('a', '', 'a')}${mol('ā', '', 'abar')}${mol('a', '', 'a')}</div>
+        <div class="col-b">порядка нет — всё сразу</div>
+      </div>
+      <div class="vs">vs</div>
+      <div class="col seq">
+        <div class="col-h">Последовательно<small>a · b · c</small></div>
+        <div class="chain">
+          <div class="chain-node"><span class="step">1</span>${mol('a', '', 'a')}</div>
+          <div class="chain-arrow">↓</div>
+          <div class="chain-node"><span class="step">2</span>${mol('ā', '', 'abar')}</div>
+          <div class="chain-arrow">↓</div>
+          <div class="chain-node"><span class="step">3</span>${mol('a', '', 'a')}</div>
+        </div>
+        <div class="col-b">порядок задан структурой</div>
+      </div>
+    </div>`,
+
+    graph: () => `<div class="scene graph-scene">
+      <svg class="graph-svg" viewBox="0 0 460 300">
+        <line class="g-edge" x1="110" y1="150" x2="342" y2="72"></line>
+        <line class="g-edge" x1="110" y1="150" x2="342" y2="228"></line>
+        <g><circle class="g-node hub" cx="110" cy="150" r="40"></circle><text class="g-label" x="110" y="147">A1</text><text class="g-sub" x="110" y="165">хаб</text></g>
+        <g><circle class="g-node" cx="342" cy="72" r="34"></circle><text class="g-label" x="342" y="77">A2</text></g>
+        <g><circle class="g-node" cx="342" cy="228" r="34"></circle><text class="g-label" x="342" y="233">A3</text></g>
+        <circle class="g-token e1" cx="110" cy="150" r="7"></circle>
+        <circle class="g-token e2" cx="110" cy="150" r="7"></circle>
+      </svg>
+      <div class="g-map"><span>⚡ событие ↔ <b>реакция</b></span><span>ребро ↔ <b>валентность</b></span><span>топология ↔ <b>порядок</b></span></div>
+    </div>`,
+
+    summary: () => `<div class="scene summary">
+      <div class="sum-cards">
+        <div class="sum-card cell"><div class="ic">🌿</div><div><div class="t">Клетка</div><div class="s">геометрия упаковки определяет поведение</div></div></div>
+        <div class="sum-card cham"><div class="ic">⚗️</div><div><div class="t">CHAM</div><div class="s">структура молекул и мембран задаёт порядок реакций</div></div></div>
+        <div class="sum-card graph"><div class="ic">⬡</div><div><div class="t">Граф simulator</div><div class="s">топология акторов задаёт порядок событий</div></div></div>
+      </div>
+      <div class="thesis-badge">структура <span>=</span> порядок</div>
+    </div>`
+  };
+
+  // ── DOM ────────────────────────────────────────────────────────────────
+  const storyNav     = document.getElementById('cm-story-nav');
+  const slidesEl     = document.getElementById('cm-slides-container');
+  const prevBtn      = document.getElementById('cm-prev-btn');
+  const nextBtn      = document.getElementById('cm-next-btn');
+  const playBtn      = document.getElementById('cm-play-btn');
+  const restartBtn   = document.getElementById('cm-restart-btn');
+  const voiceToggle  = document.getElementById('cm-voice-toggle');
+  const counter      = document.getElementById('cm-slide-counter');
+  const dotsEl       = document.getElementById('cm-slide-dots');
+  const progressBar  = document.getElementById('cm-progress-bar');
+  const presenterBtn = document.getElementById('cm-presenter-btn');
+  const stage        = document.getElementById('cm-stage');
+  const captionEl    = document.getElementById('cm-caption');
+
+  let currentSlide = 0;
+  let playing = false, speaking = false, isPaused = false;
+  let ttsAudio = null;
+  let sceneTimers = [];
+  const storyButtons = [];
+
+  // ── Scene rendering ───────────────────────────────────────────────────────
+  function clearSceneTimers() { sceneTimers.forEach(id => clearInterval(id)); sceneTimers = []; }
+
+  function renderScene(index) {
+    clearSceneTimers();
+    const d = slidesData[index];
+    stage.innerHTML = (SCENES[d.kind] || SCENES.bridge)();
+    captionEl.textContent = d.caption;
+    if (d.kind === 'sieve') startSieve();
+  }
+
+  // The sieve of Eratosthenes: strike multiples, glow primes, hold, then loop.
+  function startSieve() {
+    const nums = [...document.querySelectorAll('#cm-sieve .num')];
+    if (!nums.length) return;
+    const byN = {}; nums.forEach(el => byN[el.dataset.n] = el);
+    const primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31];
+    let p = 0;
+    const tick = () => {
+      if (p < primes.length) {
+        const prime = primes[p++];
+        if (byN[prime]) byN[prime].classList.add('prime');
+        for (let m = prime * 2; m <= 31; m += prime) {
+          if (byN[m] && !byN[m].classList.contains('prime')) byN[m].classList.add('struck');
+        }
+      } else {
+        p++;                                  // hold ~3 ticks on the finished board
+        if (p > primes.length + 3) { nums.forEach(el => el.className = 'num'); p = 0; }
+      }
+    };
+    sceneTimers.push(setInterval(tick, 600));
+  }
+
+  // ── UI ──────────────────────────────────────────────────────────────────
+  function initUI() {
+    slidesData.forEach((data, index) => {
+      if (index > 0) {
+        const arrow = document.createElement('span');
+        arrow.className = 'story-arrow'; arrow.setAttribute('aria-hidden', 'true'); arrow.textContent = '→';
+        storyNav.appendChild(arrow);
+      }
+      const sb = document.createElement('button');
+      sb.type = 'button';
+      sb.className = 'story-step' + (index === 0 ? ' active' : '');
+      sb.innerHTML = '<span class="story-index">' + (index + 1) + '</span><span>' + data.storyLabel + '</span>';
+      sb.addEventListener('click', () => goTo(index, { forceSpeak: true }));
+      storyNav.appendChild(sb);
+      storyButtons.push(sb);
+
+      const slide = document.createElement('div');
+      slide.className = 'slide' + (index === 0 ? ' active' : '');
+      slide.innerHTML = '<div class="slide-tag" style="color:' + data.tagColor + '">' + data.icon + ' ' + data.tag + '</div>' +
+        '<h1>' + data.title + '</h1>' + data.html;
+      slidesEl.appendChild(slide);
+
+      const dot = document.createElement('button');
+      dot.className = 'dot' + (index === 0 ? ' active' : '');
+      dot.style.background = index === 0 ? data.tagColor : '';
+      dot.onclick = () => goTo(index, { forceSpeak: true });
+      dot.setAttribute('aria-label', 'Слайд ' + (index + 1));
+      dotsEl.appendChild(dot);
+    });
+    updateControls();
+  }
+
+  function goTo(index, options = {}) {
+    if (index < 0 || index >= slidesData.length) return;
+    currentSlide = index;
+    renderScene(index);
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null; }
+    playing = false; speaking = false; isPaused = false;
+    playBtn.textContent = '▶ Играть';
+    progressBar.style.width = '0%';
+    updateControls();
+    updateNotesPanel(index);
+
+    const shouldSpeak = voiceToggle.checked && (options.forceSpeak || localStorage.getItem('chamAutoVoice') === '1');
+    if (shouldSpeak) speakSlide(index);
+    else { prefetch(index); prefetch(index + 1); }
+  }
+
+  function updateControls() {
+    prevBtn.disabled = currentSlide === 0;
+    nextBtn.disabled = currentSlide === slidesData.length - 1;
+    counter.textContent = (currentSlide + 1) + ' / ' + slidesData.length;
+    document.querySelectorAll('#cham .slide').forEach((el, i) => el.classList.toggle('active', i === currentSlide));
+    document.querySelectorAll('#cham .dot').forEach((dot, i) => {
+      dot.classList.toggle('active', i === currentSlide);
+      dot.style.background = i === currentSlide ? slidesData[i].tagColor : '';
+    });
+    storyButtons.forEach((b, i) => b.classList.toggle('active', i === currentSlide));
+    const active = storyButtons[currentSlide];
+    if (active) {
+      const targetLeft = active.offsetLeft - storyNav.clientWidth / 2 + active.offsetWidth / 2;
+      storyNav.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+    }
+  }
+
+  function nextSlide() { if (currentSlide < slidesData.length - 1) goTo(currentSlide + 1, { forceSpeak: true }); }
+  function prevSlide() { if (currentSlide > 0) goTo(currentSlide - 1, { forceSpeak: true }); }
+
+  // ── TTS ───────────────────────────────────────────────────────────────────
+  const preloadPool = {};
+  function ttsUrl(idx) {
+    const voice = localStorage.getItem('presentationVoiceChoice') || '';
+    return 'narration/cham/' + __voiceSlug(voice) + '/' + idx + '.mp3?v=' + NARRATION_VERSION;
+  }
+  function prefetch(idx) {
+    if (idx < 0 || idx >= slidesData.length || preloadPool[idx]) return;
+    const a = new Audio(ttsUrl(idx)); a.preload = 'auto'; preloadPool[idx] = a;
+  }
+  function speakSlide(idx) {
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null; }
+    speaking = true; playing = true; isPaused = false;
+    playBtn.textContent = '⏸ Пауза';
+    localStorage.setItem('chamAutoVoice', '1');
+    const audio = preloadPool[idx] || new Audio(ttsUrl(idx));
+    delete preloadPool[idx];
+    audio.preload = 'auto';
+    ttsAudio = audio;
+    audio.addEventListener('timeupdate', () => { if (audio.duration) progressBar.style.width = ((audio.currentTime / audio.duration) * 100) + '%'; });
+    audio.addEventListener('ended', () => {
+      speaking = false; playing = false; playBtn.textContent = '▶ Играть'; progressBar.style.width = '0%';
+      if (currentSlide < slidesData.length - 1) nextSlide();
+    });
+    audio.play().catch(() => { speaking = false; playing = false; playBtn.textContent = '▶ Играть'; });
+    prefetch(idx + 1);
+  }
+
+  // ── Presenter window ─────────────────────────────────────────────────────
+  let presenterWindow = null, presenterRenderToken = 0;
+  function presenterDoc() { return (presenterWindow && !presenterWindow.closed) ? presenterWindow.document : null; }
+  function narrationToHtml(text) {
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sentences = (text.match(/[^.!?…]+[.!?…]+["»)]*\s*/g) || [text]).map(s => s.trim()).filter(Boolean);
+    const paras = [];
+    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(' '));
+    return paras.map(p => '<p>' + esc(p) + '</p>').join('') || esc(text);
+  }
+  function renderPresenter(index) {
+    const doc = presenterDoc(); if (!doc) return;
+    const d = slidesData[index]; const token = ++presenterRenderToken;
+    const dots = slidesData.map((s, i) => '<button class="dot' + (i === index ? ' active' : '') + '" data-slide="' + i + '" style="--dot:' + s.tagColor + '"></button>').join('');
+    doc.body.innerHTML =
+      '<header><div><div class="eyebrow">🖥 Пульт докладчика</div><div class="counter">Слайд ' + (index + 1) + ' из ' + slidesData.length + '</div></div><button id="closeP" class="close">✕</button></header>' +
+      '<main class="notes"><div class="pane-label">Точный текст озвучки</div><div class="pv-tag" style="color:' + d.tagColor + '">' + d.icon + ' ' + d.tag + '</div><h2>' + d.title + '</h2><div id="pNarr" class="pv-text">Загрузка текста…</div></main>' +
+      '<footer><button id="pPrev" ' + (index === 0 ? 'disabled' : '') + '>‹</button><div class="dots">' + dots + '</div><button id="pNext" ' + (index === slidesData.length - 1 ? 'disabled' : '') + '>›</button></footer>';
+    doc.getElementById('closeP').onclick = () => presenterWindow.close();
+    doc.getElementById('pPrev').onclick = () => prevSlide();
+    doc.getElementById('pNext').onclick = () => nextSlide();
+    doc.querySelectorAll('[data-slide]').forEach(b => b.onclick = () => goTo(Number(b.dataset.slide), { forceSpeak: true }));
+    fetch('narration/cham/' + index + '.json')
+      .then(r => { if (!r.ok) throw new Error('x'); return r.json(); })
+      .then(p => { if (token !== presenterRenderToken) return; const dd = presenterDoc(); const n = dd && dd.getElementById('pNarr'); if (n) n.innerHTML = narrationToHtml(p.text); })
+      .catch(() => { const dd = presenterDoc(); const n = dd && dd.getElementById('pNarr'); if (n) n.textContent = 'Не удалось загрузить текст озвучки.'; });
+  }
+  function updateNotesPanel(index) { if (presenterDoc()) renderPresenter(index); }
+  async function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); renderPresenter(currentSlide); return; }
+    if ('documentPictureInPicture' in window) {
+      try {
+        presenterWindow = await documentPictureInPicture.requestWindow({
+          width: Math.max(360, Math.min(520, Math.round(screen.availWidth * 0.25))),
+          height: Math.max(520, Math.round(screen.availHeight * 0.88)), disallowReturnToOpener: true
+        });
+      } catch (e) { presenterWindow = null; }
+    }
+    if (!presenterWindow) presenterWindow = window.open('', 'cham-presenter-notes', 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
+    if (!presenterWindow) { alert('Браузер заблокировал окно. Разрешите всплывающие окна.'); return; }
+    presenterWindow.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Пульт — CHAM</title><style>' +
+      '*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#0a0716;color:#cabfe0;font-family:Inter,system-ui,sans-serif}body{display:flex;flex-direction:column}' +
+      'header{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#120c22;border-bottom:1px solid rgba(168,85,247,.22);z-index:2}' +
+      '.eyebrow{color:#a855f7;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.counter{margin-top:5px;color:#8c7fab;font-size:11px}' +
+      '.close{width:30px;height:30px;border:1px solid rgba(255,255,255,.1);background:#1a1130;color:#b3a5d0;border-radius:8px;cursor:pointer}' +
+      '.notes{flex:1;padding:24px 22px 86px;overflow:auto}.pane-label{margin-bottom:18px;color:#6f6394;font-size:10px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}' +
+      '.pv-tag{font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}h2{margin:11px 0 20px;color:#f2eefb;font-size:26px;line-height:1.12}' +
+      '.pv-text{font-size:17px;line-height:1.62}.pv-text p{margin:0 0 14px}.pv-text p:first-child{font-weight:600;color:#e4dcf5}' +
+      'footer{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:9px;padding:12px 14px;background:#120c22;border-top:1px solid rgba(168,85,247,.22)}' +
+      'footer>button{width:34px;height:34px;font-size:20px;border:1px solid rgba(255,255,255,.1);background:#1a1130;color:#b3a5d0;border-radius:8px;cursor:pointer}button:disabled{opacity:.25;cursor:default}' +
+      '.dots{flex:1;display:flex;justify-content:center;gap:5px}.dot{width:7px;height:7px;padding:0;border:0;border-radius:50%;background:#3a2f52;cursor:pointer}.dot.active{width:20px;border-radius:5px;background:var(--dot)}' +
+      '</style></head><body></body></html>');
+    presenterWindow.document.close();
+    presenterWindow.addEventListener('pagehide', () => { presenterBtn.textContent = '🖥 Пульт докладчика'; });
+    presenterBtn.textContent = '🖥 Пульт открыт';
+    renderPresenter(currentSlide);
+    presenterWindow.focus();
+  }
+
+  // ── Events ────────────────────────────────────────────────────────────────
+  playBtn.addEventListener('click', () => {
+    if (!voiceToggle.checked) return;
+    if (playing && !isPaused) { if (ttsAudio) ttsAudio.pause(); playing = false; isPaused = true; playBtn.textContent = '▶ Играть'; }
+    else if (isPaused && ttsAudio) { ttsAudio.play(); playing = true; isPaused = false; playBtn.textContent = '⏸ Пауза'; }
+    else speakSlide(currentSlide);
+  });
+  restartBtn.addEventListener('click', () => goTo(0, { forceSpeak: true }));
+  prevBtn.addEventListener('click', prevSlide);
+  nextBtn.addEventListener('click', nextSlide);
+  presenterBtn.addEventListener('click', openPresenter);
+  voiceToggle.addEventListener('change', () => {
+    localStorage.setItem('chamAutoVoice', voiceToggle.checked ? '1' : '0');
+    if (!voiceToggle.checked && ttsAudio) {
+      ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null;
+      playing = false; speaking = false; isPaused = false;
+      playBtn.textContent = '▶ Играть'; progressBar.style.width = '0%';
+    }
+  });
+  voiceToggle.checked = localStorage.getItem('chamAutoVoice') !== '0';
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); presenterBtn.click(); }
+  });
+
+  // ── Boot ────────────────────────────────────────────────────────────────
+  initUI();
+  const hashSlide = parseInt((location.hash || '').replace('#', ''), 10);
+  const startIndex = Number.isInteger(hashSlide) && hashSlide >= 1 && hashSlide <= slidesData.length ? hashSlide - 1 : 0;
+  currentSlide = startIndex;
+  renderScene(startIndex);
+  updateControls();
+  prefetch(startIndex); prefetch(startIndex + 1);
+})();
+</script>
+</body>
+</html>

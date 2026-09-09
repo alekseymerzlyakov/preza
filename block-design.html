@@ -1,0 +1,1976 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Блок-дизайн · комбинаторика баланса — BIBD, плоскость Фано, системы Штейнера</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #04070a; }
+
+    /* console-deck shell (shared with llm-testing/router-cve/cham); cyan primary + violet + gold accent */
+    #cham-app {
+      --bg: #04070b;
+      --panel: #0a1018;
+      --panel-glass: rgba(10, 16, 24, 0.75);
+      --border: rgba(34, 211, 238, 0.22);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --text: #eaf6fb;
+      --muted: #8fa3b3;
+      --violet: #a855f7;
+      --violet-glow: rgba(168, 85, 247, 0.45);
+      --magenta: #ec4899;
+      --cyan: #22d3ee;
+      --cyan-glow: rgba(34, 211, 238, 0.4);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.4);
+      --amber: #f59e0b;
+      --gold: #fbbf24;
+      --blue: #3b82f6;
+      --red: #ef4444;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Top Story Navigator ── */
+    .top-nav {
+      flex-shrink: 0;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, #071820 0%, #04070b 100%);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
+      z-index: 10;
+    }
+    .top-nav::-webkit-scrollbar { height: 3px; }
+    .top-nav::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 3px; }
+
+    .nav-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-badge:hover {
+      color: #fff;
+      border-color: var(--cyan);
+      background: rgba(34, 211, 238, 0.12);
+      transform: translateY(-1px);
+    }
+    .nav-badge.active {
+      color: #04141a;
+      background: linear-gradient(135deg, #67e8f9, #22d3ee);
+      border-color: #67e8f9;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+    .nav-badge .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.25);
+      color: inherit;
+      font-size: 0.62rem;
+      font-weight: 800;
+    }
+    .nav-sep { color: rgba(34, 211, 238, 0.35); font-size: 0.75rem; flex-shrink: 0; }
+
+    /* ── Main Layout ── */
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* ── Left Narrative Deck ── */
+    .deck-panel {
+      width: 480px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg, #071620 0%, #04070b 100%);
+      z-index: 5;
+      box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.02em;
+    }
+    .brand-title span { color: var(--violet); }
+    .brand-subtitle { font-size: 0.7rem; color: var(--muted); font-weight: 500; margin-top: 2px; }
+
+    .btn-presenter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(34, 211, 238, 0.08);
+      color: var(--cyan);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-presenter:hover {
+      background: rgba(34, 211, 238, 0.22);
+      border-color: #67e8f9;
+      color: #fff;
+    }
+
+    .deck-scroll {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 28px 32px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .deck-scroll::-webkit-scrollbar { width: 4px; }
+    .deck-scroll::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.25); border-radius: 2px; }
+
+    .slide-view { display: none; animation: slideFade 0.35s ease-out; }
+    .slide-view.active { display: block; }
+    @keyframes slideFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .slide-tag-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .slide-tag-line::before {
+      content: '';
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .slide-title {
+      font-size: 1.85rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.18;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+
+    .slide-desc {
+      font-size: 1.02rem;
+      line-height: 1.68;
+      color: #cddbe4;
+      margin-bottom: 18px;
+    }
+    .slide-desc strong { color: #fff; font-weight: 700; }
+    .slide-desc .hl-cyan { color: var(--cyan); font-weight: 700; }
+    .slide-desc .hl-violet { color: #c084fc; font-weight: 700; }
+    .slide-desc .hl-emerald { color: var(--emerald); font-weight: 700; }
+    .slide-desc .hl-amber { color: var(--amber); font-weight: 700; }
+    .slide-desc .hl-gold { color: var(--gold); font-weight: 700; }
+    .slide-desc .hl-red { color: var(--red); font-weight: 700; }
+    .slide-desc .f {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      color: #fff;
+      background: rgba(34,211,238,0.12);
+      border: 1px solid rgba(34,211,238,0.3);
+      border-radius: 5px;
+      padding: 1px 6px;
+      font-size: 0.9em;
+      white-space: nowrap;
+    }
+
+    .callout-box {
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(34, 211, 238, 0.08);
+      border: 1px solid rgba(34, 211, 238, 0.28);
+      border-left: 4px solid var(--cyan);
+      color: #c6e7ef;
+      font-size: 0.92rem;
+      line-height: 1.58;
+      margin-top: 14px;
+    }
+    .callout-box.emerald {
+      background: rgba(16, 185, 129, 0.07);
+      border-color: rgba(16, 185, 129, 0.28);
+      border-left-color: var(--emerald);
+      color: #a7e5ce;
+    }
+    .callout-box.cyan {
+      background: rgba(34, 211, 238, 0.07);
+      border-color: rgba(34, 211, 238, 0.28);
+      border-left-color: var(--cyan);
+      color: #b2eaf5;
+    }
+    .callout-box.violet {
+      background: rgba(168, 85, 247, 0.08);
+      border-color: rgba(168, 85, 247, 0.3);
+      border-left-color: var(--violet);
+      color: #ddc4fb;
+    }
+    .callout-box.amber {
+      background: rgba(245, 158, 11, 0.07);
+      border-color: rgba(245, 158, 11, 0.28);
+      border-left-color: var(--amber);
+      color: #ecd29b;
+    }
+    .callout-box.gold {
+      background: rgba(251, 191, 36, 0.08);
+      border-color: rgba(251, 191, 36, 0.3);
+      border-left-color: var(--gold);
+      color: #f3dca0;
+    }
+    .callout-box.blue {
+      background: rgba(59, 130, 246, 0.07);
+      border-color: rgba(59, 130, 246, 0.28);
+      border-left-color: var(--blue);
+      color: #b9d6fc;
+    }
+    .callout-box.red {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.3);
+      border-left-color: var(--red);
+      color: #f6b9b9;
+    }
+    .callout-box b, .callout-box strong { color: #fff; }
+    .callout-box .f {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      color: #fff;
+      padding: 0 3px;
+    }
+
+    .code-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(168, 85, 247, 0.14);
+      border: 1px solid rgba(168, 85, 247, 0.32);
+      color: #e2ccfb;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      font-weight: 700;
+    }
+
+    /* ── Bottom Deck Controls ── */
+    .deck-controls {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      gap: 8px;
+      flex-shrink: 0;
+      background: #061019;
+    }
+    .ctl-btn {
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .ctl-btn.icon-only { width: 34px; padding: 0; font-size: 15px; }
+    .ctl-btn.primary {
+      background: var(--cyan);
+      color: #04141a;
+      border: none;
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+    .ctl-btn.primary:hover:not(:disabled) { background: #67e8f9; color: #000; }
+    .ctl-btn.ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-light);
+      color: var(--muted);
+    }
+    .ctl-btn.ghost:hover:not(:disabled) {
+      border-color: var(--cyan);
+      color: #fff;
+      background: rgba(34, 211, 238, 0.1);
+    }
+    .ctl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .deck-progress {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 0 4px;
+    }
+    .deck-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--violet), var(--cyan));
+      transition: width 0.2s linear;
+    }
+
+    .slide-counter-badge {
+      font-size: 0.74rem;
+      font-weight: 800;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .voice-toggle-label {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .voice-toggle-label input { position: absolute; opacity: 0; pointer-events: none; }
+    .voice-toggle-label:hover { border-color: var(--cyan); }
+    .voice-toggle-label input:checked + .v-icon { color: var(--cyan); filter: drop-shadow(0 0 6px var(--cyan)); }
+    .v-icon { font-size: 15px; }
+
+    /* ── Right Stage: Interactive Physics & Graphics ── */
+    .stage-panel {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #stage-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Floating Canvas HUD Overlays */
+    .stage-hud-top {
+      position: absolute;
+      top: 18px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(6, 14, 20, 0.85);
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      backdrop-filter: blur(10px);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #dcefff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .hud-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: hudPulse 1.8s infinite;
+    }
+    @keyframes hudPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+
+    .hud-controls-group {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-action-btn {
+      padding: 7px 14px;
+      border-radius: 14px;
+      background: rgba(168, 85, 247, 0.18);
+      border: 1px solid rgba(168, 85, 247, 0.45);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
+    .hud-action-btn:hover {
+      background: var(--violet);
+      color: #fff;
+      box-shadow: 0 0 16px var(--violet-glow);
+      transform: translateY(-1px);
+    }
+
+    .stage-hud-bottom {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      width: max-content;
+      max-width: min(560px, 88%);
+    }
+    .stage-scene-note {
+      pointer-events: none;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #a9c2d1;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      max-width: 100%;
+    }
+    .stage-caption-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 22px;
+      border-radius: 30px;
+      background: rgba(5, 12, 18, 0.92);
+      border: 1px solid rgba(34, 211, 238, 0.45);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      color: #edf6fa;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .stage-caption-pill .cap-icon { color: var(--violet); font-size: 1rem; }
+
+    .interactive-dock {
+      position: absolute;
+      bottom: 106px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    .stage-legend {
+      position: absolute;
+      bottom: 20px;
+      left: 24px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(5, 12, 18, 0.82);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      pointer-events: none;
+      max-width: 250px;
+    }
+    .stage-legend .legend-title {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .stage-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #e0eef5;
+      line-height: 1.2;
+    }
+    .stage-legend .legend-dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .stage-fade {
+      position: absolute;
+      inset: 0;
+      z-index: 9;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+    }
+  </style>
+</head>
+<body>
+
+<div id="cham-app">
+  <nav class="top-nav" id="top-nav" aria-label="Путь презентации"></nav>
+
+  <div class="main-workspace">
+
+    <aside class="deck-panel">
+      <div class="brand-header">
+        <div>
+          <div class="brand-title">◆ Блок-<span>дизайн</span></div>
+          <div class="brand-subtitle">комбинаторика баланса · BIBD · плоскость Фано · системы Штейнера</div>
+        </div>
+        <button class="btn-presenter" id="btn-presenter" title="Открыть пульт докладчика">🖥 Пульт</button>
+      </div>
+
+      <div class="deck-scroll" id="deck-scroll"></div>
+
+      <div class="deck-controls">
+        <button id="btn-prev" class="ctl-btn ghost icon-only" aria-label="Назад" disabled>‹</button>
+        <button id="btn-play" class="ctl-btn primary">▶ Играть</button>
+        <button id="btn-restart" class="ctl-btn ghost icon-only" title="В начало">↺</button>
+        <div class="deck-progress"><div class="deck-progress-fill" id="progress-bar"></div></div>
+        <span class="slide-counter-badge" id="slide-counter">1 / 12</span>
+        <label class="voice-toggle-label" title="Озвучка (TTS)" aria-label="Голос">
+          <input type="checkbox" id="voice-toggle">
+          <span class="v-icon">🗣️</span>
+        </label>
+        <select id="vpick-select" title="Голос докладчика" aria-label="Голос докладчика" style="height:32px;border:1px solid #30363d;border-radius:7px;background:#0d1117;color:#c9d1d9;padding:0 8px;font:inherit;font-size:.8rem;cursor:pointer;max-width:160px;">
+          <option value="edge:ru-RU-DmitryNeural">🤖 Стандартный</option>
+          <option value="elevenlabs:mine">🎙 Мой голос</option>
+        </select>
+        <script>window.__voiceSlug=function(v){v=String(v||'');return v.indexOf('elevenlabs')===0?'mine':'edge';};</script>
+<script>(function(){var K='presentationVoiceChoice',D='elevenlabs:mine',s=document.getElementById('vpick-select');var v=localStorage.getItem(K);if(!v){v=D;localStorage.setItem(K,D);}s.value=[].some.call(s.options,function(o){return o.value===v})?v:D;s.addEventListener('change',function(){localStorage.setItem(K,s.value||D);});})();</script>
+        <button id="btn-next" class="ctl-btn ghost">Далее ›</button>
+      </div>
+    </aside>
+
+    <main class="stage-panel">
+      <canvas id="stage-canvas"></canvas>
+      <div class="stage-fade" id="stage-fade"></div>
+      <div class="stage-legend" id="stage-legend"></div>
+
+      <div class="stage-hud-top">
+        <div class="hud-pill">
+          <span class="hud-dot" id="hud-status-dot"></span>
+          <span id="hud-status-text">Block Design Lab · 60 FPS</span>
+        </div>
+        <div class="hud-controls-group" id="hud-actions"></div>
+      </div>
+
+      <div class="interactive-dock" id="interactive-dock"></div>
+
+      <div class="stage-hud-bottom">
+        <div class="stage-caption-pill">
+          <span class="cap-icon">✦</span>
+          <span id="stage-caption-text">Инициализация…</span>
+        </div>
+        <div class="stage-scene-note" id="stage-scene-note"></div>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COLORS
+  // ═══════════════════════════════════════════════════════════════════════════
+  const CY = '#22d3ee', EM = '#10b981', RED = '#ef4444', AMB = '#f59e0b',
+        VIO = '#a855f7', BLUE = '#3b82f6', MAG = '#ec4899', GOLD = '#fbbf24', MUT = '#64748b';
+
+  // Fano plane (7,3,1): points 0..6 = 1..7; 7 lines (last one is the circle F·D·E)
+  // pt index: 0=A(top) 1=B(bl) 2=C(br) 3=F(mid AB) 4=D(mid BC) 5=E(mid CA) 6=G(center)
+  const FANO_LINES = [[0,3,1],[1,4,2],[2,5,0],[0,6,4],[1,6,5],[2,6,3],[3,4,5]];
+
+  // Simulator slide: parameter value-counts of a process graph (ветки/таймауты/ретраи/входы/флаг)
+  const SIM_VALS = [3, 3, 2, 2, 2]; // full product = 72
+  // Greedy strength-2 covering array — guaranteed to cover EVERY pair of values (loops until dry).
+  function buildCA(vals) {
+    const k = vals.length;
+    const key = (i, a, j, b) => i + ':' + a + '-' + j + ':' + b;
+    const need = new Set();
+    for (let i = 0; i < k; i++) for (let j = i + 1; j < k; j++)
+      for (let a = 0; a < vals[i]; a++) for (let b = 0; b < vals[j]; b++) need.add(key(i, a, j, b));
+    const rows = [];
+    let guard = 0;
+    while (need.size && guard++ < 300) {
+      let best = null, bestCov = -1;
+      for (let tries = 0; tries < 60; tries++) {
+        const row = vals.map(v => Math.floor(Math.random() * v));
+        let cov = 0;
+        for (let i = 0; i < k; i++) for (let j = i + 1; j < k; j++) if (need.has(key(i, row[i], j, row[j]))) cov++;
+        if (cov > bestCov) { bestCov = cov; best = row; }
+      }
+      rows.push(best);
+      for (let i = 0; i < k; i++) for (let j = i + 1; j < k; j++) need.delete(key(i, best[i], j, best[j]));
+    }
+    return rows;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SLIDES DATA
+  // ═══════════════════════════════════════════════════════════════════════════
+  const slidesData = [
+    {
+      icon: '◆', tag: 'Введение', tagColor: VIO, storyLabel: 'Что это', mode: 'intro',
+      caption: 'Блок-дизайн: как собрать множество в группы идеально сбалансированно',
+      sceneNote: 'Точки-хаос слева собираются в аккуратные блоки справа. Баланс превращает набор в структуру.',
+      title: 'Блок-дизайн — комбинаторика баланса',
+      desc: `Одна из красивейших идей комбинаторики: как разбить множество на <span class="hl-cyan">группы (блоки)</span> так, чтобы всё было <strong>идеально симметрично</strong>. Формально — множество <span class="hl-gold">точек</span> и семья его подмножеств, подчинённых строгим правилам. Житейски — как составить турнир или расписание, чтобы каждый встретился с каждым <strong>одинаковое число раз</strong>.`,
+      callout: `<b>Дальше по шагам:</b> определение, пять параметров, два закона, неравенство Фишера, плоскость Фано, системы Штейнера, задача Киркмана, когда схемы <b>не существует</b>, и где всё это работает.`,
+      calloutClass: 'violet'
+    },
+    {
+      icon: '🎯', tag: 'Определение', tagColor: CY, storyLabel: 'BIBD', mode: 'bibd_def',
+      caption: 'BIBD (2-схема): v точек, блоки по k, точка в r блоках, пара — в λ блоках',
+      sceneNote: 'Подсвечена пара точек — она лежит ровно в λ блоках. В этом и есть «баланс».',
+      title: 'Что такое сбалансированная схема (BIBD)',
+      desc: `Главный герой — <strong>сбалансированная неполная блок-схема</strong> (BIBD), она же <span class="hl-cyan">2-схема</span>. Четыре правила: есть <span class="f">v</span> точек; каждый блок содержит ровно <span class="f">k</span> точек; каждая точка входит ровно в <span class="f">r</span> блоков; и главное — любая <span class="hl-violet">пара точек</span> встречается вместе ровно в <span class="f">λ</span> блоках.`,
+      callout: `<b>«Неполная»</b> — блок меньше всего множества (не берём всех сразу). Именно постоянство <b>λ</b> для всех пар и делает схему честной и симметричной.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '🔢', tag: 'Параметры', tagColor: GOLD, storyLabel: 'v · b · r · k · λ', mode: 'params',
+      caption: 'Пять параметров схемы и живой пример — (7, 3, 1)',
+      sceneNote: 'Матрица инцидентности: строки — точки, столбцы — блоки. Точка в блоке = светящаяся клетка.',
+      title: 'Пять параметров и запись 2-(v, k, λ)',
+      desc: `Схему задают пять чисел: <span class="hl-gold">v</span> — точек, <span class="hl-cyan">b</span> — блоков, <span class="f">r</span> — блоков через точку, <span class="f">k</span> — точек в блоке, <span class="hl-violet">λ</span> — блоков на пару. Пишут коротко: <span class="f">2-(v, k, λ)</span>. Пример — знаменитая <strong>(7, 3, 1)</strong>: <span class="f">v=7, b=7, r=3, k=3, λ=1</span>.`,
+      callout: `<b>Матрица инцидентности</b> — сердце схемы: v строк × b столбцов из 0 и 1. Из неё дальше вырастут и коды, и геометрия.`,
+      calloutClass: 'gold'
+    },
+    {
+      icon: '⚖️', tag: 'Соотношения', tagColor: EM, storyLabel: 'Два закона', mode: 'relations',
+      caption: 'Два закона из простого подсчёта: b·k = v·r и λ(v−1) = r(k−1)',
+      sceneNote: 'Считаем инцидентности «точка в блоке» двумя способами — получаем первый закон. Второй — из подсчёта пар вокруг точки.',
+      title: 'Два соотношения между параметрами',
+      desc: `Пять чисел не свободны — их связывают два равенства, оба из <strong>двойного подсчёта</strong>. Первое: <span class="f">b·k = v·r</span> (дважды считаем пары «точка в блоке»). Второе: <span class="f">λ(v−1) = r(k−1)</span> (считаем тройки «точка–вторая точка–общий блок»).`,
+      callout: `<b>Проверка на (7,3,1):</b> <span class="f">7·3 = 7·3 = 21</span> ✓ и <span class="f">1·6 = 3·2 = 6</span> ✓. Числа обязаны сходиться — иначе схемы нет.`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '📐', tag: 'Ограничение', tagColor: BLUE, storyLabel: 'Фишер', mode: 'fisher',
+      caption: 'Неравенство Фишера: блоков всегда не меньше, чем точек — b ≥ v',
+      sceneNote: 'Столбик блоков b никогда не опускается ниже столбика точек v. Это не подсчёт, а теорема.',
+      title: 'Неравенство Фишера: b ≥ v',
+      desc: `Ещё один фундамент — <strong>неравенство Фишера</strong>: <span class="f">b ≥ v</span>. Блоков всегда <span class="hl-cyan">не меньше</span>, чем точек — иначе честно сбалансировать все пары невозможно. Это уже не элементарный подсчёт, а глубокая теорема линейной алгебры.`,
+      callout: `Когда достигается равенство <span class="f">b = v</span>, схему называют <b>симметричной</b> — у неё появляется особая красота (следующий шаг).`,
+      calloutClass: 'blue'
+    },
+    {
+      icon: '✴️', tag: 'Пример-икона', tagColor: GOLD, storyLabel: 'Плоскость Фано', mode: 'fano',
+      caption: 'Плоскость Фано — схема (7,3,1) во плоти: 7 точек, 7 прямых, на каждой — 3 точки',
+      sceneNote: 'Одна из «прямых» — окружность в центре. В конечной геометрии это нормально.',
+      title: 'Плоскость Фано — (7, 3, 1)',
+      desc: `Самая знаменитая блок-схема. <strong>7 точек, 7 прямых</strong>, на каждой прямой ровно <span class="f">3</span> точки. Любые <span class="hl-violet">две точки</span> лежат ровно на <span class="hl-gold">одной</span> общей прямой, а любые две прямые пересекаются ровно в одной точке. Обратите внимание: седьмая «прямая» нарисована <span class="hl-cyan">окружностью</span>.`,
+      callout: `Это <b>три объекта разом</b>: BIBD (7,3,1) · простейшая проективная плоскость (порядка 2) · система троек Штейнера S(2,3,7).`,
+      calloutClass: 'gold'
+    },
+    {
+      icon: '🪞', tag: 'Симметричные', tagColor: VIO, storyLabel: 'Симметрия', mode: 'symmetric',
+      caption: 'Симметричные схемы (b = v ⇒ r = k): два блока пересекаются ровно в λ точках',
+      sceneNote: 'Матрица инцидентности становится квадратной. Проективная плоскость порядка n: v = n²+n+1.',
+      title: 'Симметричные схемы и проективные плоскости',
+      desc: `Если <span class="f">b = v</span>, то и <span class="f">r = k</span> — схема <strong>симметричная</strong>. У неё зеркальное свойство: любые <span class="hl-cyan">два блока</span> пересекаются ровно в <span class="f">λ</span> точках (как две точки лежат в λ общих блоках). Главный класс — <span class="hl-gold">проективные плоскости</span> (λ=1): у плоскости порядка n ровно <span class="f">v = b = n²+n+1</span> точек и <span class="f">k = r = n+1</span>.`,
+      callout: `При <span class="f">n = 2</span>: <span class="f">2²+2+1 = 7</span> — это и есть плоскость Фано. А λ=2 даёт <b>бипланы</b> (напр. 11 точек, геометрия Пэли).`,
+      calloutClass: 'violet'
+    },
+    {
+      icon: '🧩', tag: 'Штейнер / t-схемы', tagColor: CY, storyLabel: 'Штейнер', mode: 'steiner',
+      caption: 'Системы троек Штейнера S(2,3,v) и обобщение до t-схем',
+      sceneNote: 'Каждая пара точек накрыта ровно одной тройкой. Обобщаем: каждое t-подмножество — в λ блоках.',
+      title: 'Системы Штейнера и t-схемы',
+      desc: `Плоскость Фано — частный случай большого семейства. <strong>Система троек Штейнера</strong> <span class="f">S(2,3,v)</span>: каждая пара лежит ровно в одной тройке (существует при <span class="f">v ≡ 1,3 (mod 6)</span> — это 7, 9, 13, 15…). Обобщение — <span class="hl-violet">t-схема</span>: каждое подмножество из <span class="f">t</span> точек попадает ровно в <span class="f">λ</span> блоков.`,
+      callout: `<b>Красивый факт:</b> любая t-схема при <span class="f">t ≥ 2</span> автоматически является и 2-схемой. Системы Штейнера — это случай <span class="f">λ = 1</span>.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '🚶', tag: 'Разрешимые', tagColor: AMB, storyLabel: 'Киркман', mode: 'kirkman',
+      caption: 'Задача Киркмана о 15 школьницах — разрешимая схема 2-(15,3,1)',
+      sceneNote: '7 дней = 7 параллельных классов. Каждый день — 5 троек, покрывающих всех 15 девочек без пересечений.',
+      title: 'Разрешимые схемы: 15 школьниц Киркмана',
+      desc: `Иногда блоки можно ещё и разложить по дням. <strong>Разрешимая схема</strong> — её блоки делятся на <span class="hl-amber">параллельные классы</span>, и каждый класс сам покрывает все точки без пересечений. Классика — <strong>15 школьниц</strong>: гулять 7 дней по трое так, чтобы каждые две шли вместе ровно раз. Это <span class="f">2-(15,3,1)</span>: <span class="f">35</span> троек на <span class="f">7</span> дней по <span class="f">5</span>.`,
+      callout: `Для разрешимых схем — усиленный Фишер: <span class="f">b ≥ v + c − 1</span>, где c — число параллельных классов.`,
+      calloutClass: 'amber'
+    },
+    {
+      icon: '🚫', tag: 'Существование', tagColor: RED, storyLabel: 'Когда нет', mode: 'existence',
+      caption: 'Подходящие числа — не гарантия: (43,7,1) удовлетворяет законам, но не существует',
+      sceneNote: 'Оба базовых равенства для (43,7,1) выполнены идеально — а схемы нет. Это теорема Брука–Райзера–Чоула.',
+      title: 'Когда схемы не существует',
+      desc: `А для любых ли чисел схема есть? <strong>Нет.</strong> Оба закона и неравенство Фишера — лишь <span class="hl-red">необходимые</span>, но не достаточные условия. Для симметричных схем есть ещё теорема <strong>Брука–Райзера–Чоула</strong>. Хрестоматийный пример — <span class="f">(43, 7, 1)</span>: арифметика сходится идеально, а самой схемы <span class="hl-red">не существует</span> (доказано).`,
+      callout: `<b>Мораль:</b> подходящие параметры — это приглашение искать схему, но не обещание, что она есть.`,
+      calloutClass: 'red'
+    },
+    {
+      icon: '🛠', tag: 'Применения', tagColor: EM, storyLabel: 'Где работает', mode: 'applications',
+      caption: 'От планирования экспериментов до кодов, криптографии и тестирования ПО',
+      sceneNote: 'Матрица инцидентности — общий мост: коды, конечная геометрия, латинские квадраты, комбинаторные тесты.',
+      title: 'Где всё это работает',
+      desc: `Блок-схемы родились в <strong>планировании экспериментов</strong>: например, честно испытать <span class="hl-gold">3 крема</span> на <span class="hl-cyan">2 руках</span> — это BIBD <span class="f">v=3, k=2, λ=1</span> (даёт b=3, r=2). Сегодня они живут в <span class="hl-violet">помехоустойчивых кодах</span> (матрица инцидентности → код), криптографии, конечной геометрии, роднятся с <strong>латинскими квадратами</strong>.`,
+      callout: `<b>Ближе к нам:</b> комбинаторное (pairwise) тестирование — покрыть все пары настроек небольшим сбалансированным набором тестов вместо полного перебора. Одна идея — <b>баланс</b> — рождает структуру.`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '🧩', tag: 'Как мы · simulator', tagColor: EM, storyLabel: 'В simulator', mode: 'simulator',
+      caption: 'Как применить у нас: pairwise-тестирование графов simulator покрывающим массивом',
+      sceneNote: 'Полный перебор настроек графа взрывается. Покрывающий массив бьёт все пары горсткой прогонов.',
+      title: 'Как применить у нас: тестирование графов',
+      desc: `Самое сильное применение для нас — <strong>комбинаторное тестирование процессов</strong>. У графа в simulator много «ручек»: <span class="hl-cyan">ветки условий, таймауты, ретраи, типы входных данных</span>. Проверять все сочетания — полный перебор, который взрывается. Идея баланса: не нужно всё — достаточно <strong>покрыть все пары значений</strong> небольшим набором прогонов (<span class="hl-gold">покрывающий массив</span>), ведь большинство багов выстреливает именно на паре условий.`,
+      callout: `<b>Честно:</b> это не строгий BIBD (где пара — <span class="f">ровно λ</span> раз), а его младший брат — нужно лишь <span class="f">хотя бы раз</span>. Но идея одна: <b>баланс вместо перебора</b>. Итог: вместо тысяч прогонов графа — десяток, и каждая пара проверена.`,
+      calloutClass: 'emerald'
+    }
+  ];
+
+  // Пульт-only подсказки докладчику (не входят в озвучку).
+  const PRESENTER_TIPS = [
+    'Сцена: слева облако «точек-хаоса», справа те же точки, собранные в аккуратные блоки. Задай рамку: блок-дизайн — про то, как разбить множество на группы идеально сбалансированно (турнир, расписание, эксперимент). Кнопка «🎲 Пересобрать» заново проигрывает сборку хаоса в структуру.',
+    'Кнопка <b>«✨ Подсветить пару»</b> выбирает пару точек и зажигает все блоки, где эта пара встречается — их ровно λ. Проговори четыре правила: v точек, k в блоке, r блоков через точку, λ на каждую пару. «Неполная» = блок меньше всего множества.',
+    'Сцена — матрица инцидентности (7×7 для примера (7,3,1)): строки точки, столбцы блоки, светящаяся клетка = точка входит в блок. Обрати внимание: в каждой строке ровно r=3 огонька, в каждом столбце ровно k=3. Запись 2-(v,k,λ) читается «два-схема семь-три-один».',
+    'Кнопка <b>«🔢 Пересчитать»</b> прогоняет двойной подсчёт: одни и те же инцидентности считаются по строкам и по столбцам → b·k=v·r. Второе равенство λ(v−1)=r(k−1) — из подсчёта пар вокруг точки. Внизу схема сама проверяет числа (7,3,1): 21=21, 6=6.',
+    'Сцена: два столбика — b (блоки) и v (точки); b никогда не ниже v. Подчеркни: Фишер b≥v — это теорема, а не подсчёт. Равенство b=v — это «симметричная схема», мостик к следующему слайду.',
+    'Кнопка <b>«▶ Прогнать прямые»</b> по очереди подсвечивает все 7 прямых Фано (7-я — окружность в центре). Дай залу самим проверить: любые две точки — на одной прямой; любые две прямые — в одной точке. Это одновременно BIBD (7,3,1), проективная плоскость порядка 2 и система Штейнера S(2,3,7).',
+    'Сцена: квадратная матрица инцидентности (b=v) и формула проективной плоскости v=n²+n+1. Слайдер n (кнопка «⟳ n+1») меняет порядок: n=2→7, n=3→13, n=4→21. Главное свойство: два блока пересекаются ровно в λ точках — зеркало к «две точки в λ блоках».',
+    'Сцена: точки и тройки, каждая пара накрыта ровно раз (S(2,3,v)). Кнопка «⟳ v: 7 ↔ 9» переключает между Фано (7) и аффинной плоскостью (9). Обобщение до t-схем: подсвечивается, что каждое t-подмножество — в λ блоках. Ключевой факт: t-схема (t≥2) — всегда и 2-схема.',
+    'Кнопка <b>«📅 Следующий день»</b> перегруппировывает 15 девочек в новый параллельный класс (5 троек без пересечений). Всего 7 дней. Дай прочувствовать: за неделю каждая пара встретилась ровно раз. Это и есть «разрешимость»: блоки раскладываются по дням. Формула b≥v+c−1.',
+    'Сцена — таблица параметров: (7,3,1), (15,3,1), (11,5,2) существуют (зелёные), а (43,7,1) — красная, хотя оба равенства для неё выполнены (показаны галочки 301=301, 42=42). Это теорема Брука–Райзера–Чоула. Мораль: арифметика — необходима, но не достаточна.',
+    'Сцена-хаб: в центре матрица инцидентности, от неё лучи к применениям — планирование эксперимента (3 крема/2 руки), помехоустойчивые коды, конечная геометрия, латинские квадраты, комбинаторное тестирование. Заверши мыслью: одна идея баланса — и столько применений. Ближе к нам — pairwise-тестирование.',
+    'Сцена в стиле нашего конструктора: сверху граф процесса (Старт → Условие → API → Ответ) с бегущими токенами-прогонами, снизу — живой покрывающий массив (строка = один прогон графа, столбцы P1..P5 = настройки). Кнопка «🎲 Другой набор» генерирует новый массив (он всегда покрывает ВСЕ пары — считается в коде). Справа числа: полный перебор 72 против ~десятка pairwise-прогонов. Обязательно проговори честную оговорку: это covering array, а не строгий BIBD — паре нужно встретиться «хотя бы раз», а не «ровно λ». И приземли: у нас уже есть скил jira-qa + доступ к графу simulator, генератор массива навесить реально.'
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CANVAS ENGINE
+  // ═══════════════════════════════════════════════════════════════════════════
+  const canvas = document.getElementById('stage-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Projector readability: enlarge EVERY on-canvas label uniformly.
+  const FONT_SCALE = 1.32;
+  const _fontDesc = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'font');
+  Object.defineProperty(ctx, 'font', {
+    configurable: true,
+    get() { return _fontDesc.get.call(this); },
+    set(v) {
+      _fontDesc.set.call(this, String(v).replace(/(\d+(?:\.\d+)?)px/, (m, n) => (parseFloat(n) * FONT_SCALE).toFixed(1) + 'px'));
+    }
+  });
+
+  let width = 0, height = 0, dpr = 1;
+  function resizeCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    width = rect.width; height = rect.height;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.resetTransform && ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  let currentSlide = 0;
+  let animTime = 0;
+  let shockwaves = [];
+  let sparks = [];
+  let customState = {};
+
+  function addSparks(x, y, color, count = 16, maxSpeed = 5) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * maxSpeed;
+      sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 1.0, decay: 0.02 + Math.random() * 0.03, color, size: 2 + Math.random() * 3 });
+    }
+  }
+  function addShockwave(x, y, color, maxRadius = 80) {
+    shockwaves.push({ x, y, radius: 5, maxRadius, life: 1.0, decay: 0.03, color });
+  }
+
+  // ── Shared draw helpers ──
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function box(x, y, w, h, color, title, sub, opts) {
+    opts = opts || {};
+    ctx.save();
+    rr(x, y, w, h, opts.radius || 12);
+    ctx.fillStyle = opts.bg || 'rgba(8,16,24,0.88)';
+    ctx.fill();
+    ctx.lineWidth = opts.lw || 2;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color; ctx.shadowBlur = opts.glow != null ? opts.glow : 14;
+    ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (title) {
+      ctx.fillStyle = '#fff'; ctx.font = '700 15px Inter';
+      ctx.fillText(title, x + w / 2, y + h / 2 - (sub ? 9 : 0));
+    }
+    if (sub) { ctx.fillStyle = color; ctx.font = '700 12px JetBrains Mono'; ctx.fillText(sub, x + w / 2, y + h / 2 + 11); }
+    ctx.restore();
+  }
+  function line(x1, y1, x2, y2, color, w, dash) {
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = w || 2;
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.restore();
+  }
+  function flowDots(x1, y1, x2, y2, color, speed, count, size) {
+    for (let i = 0; i < count; i++) {
+      const t = ((animTime * speed + i / count) % 1);
+      const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
+      ctx.save();
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
+      ctx.globalAlpha = 0.35 + 0.5 * Math.sin(t * Math.PI);
+      ctx.beginPath(); ctx.arc(x, y, size || 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  function label(txt, x, y, color, size, weight, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = (weight || 700) + ' ' + (size || 13) + 'px Inter';
+    ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+  function mono(txt, x, y, color, size, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = '700 ' + (size || 13) + 'px JetBrains Mono';
+    ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+  // horizontal progress/score bar
+  function bar(x, y, w, h, frac, color) {
+    ctx.save();
+    rr(x, y, w, h, h / 2); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
+    if (frac > 0) {
+      rr(x, y, Math.max(h, w * Math.min(1, frac)), h, h / 2);
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill();
+    }
+    ctx.restore();
+  }
+  // filled point (a "point" of the design)
+  function dot(x, y, r, color, glow) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = glow != null ? glow : 10;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  // formula chip — designed pill with mono text (the whole point of this deck: formulas as art)
+  function formula(txt, x, y, color, size, opts) {
+    opts = opts || {};
+    size = size || 16;
+    ctx.save();
+    ctx.font = '800 ' + size + 'px JetBrains Mono';
+    const tw = ctx.measureText(txt).width;
+    const padX = 16, h = size * FONT_SCALE + 18, w = tw + padX * 2;
+    const x0 = opts.align === 'left' ? x : (opts.align === 'right' ? x - w : x - w / 2);
+    rr(x0, y - h / 2, w, h, 10);
+    ctx.fillStyle = opts.bg || 'rgba(5,12,18,0.94)';
+    ctx.fill();
+    ctx.lineWidth = 1.8; ctx.strokeStyle = color;
+    ctx.shadowColor = color; ctx.shadowBlur = opts.glow != null ? opts.glow : 14; ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.fillStyle = opts.textColor || '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '800 ' + size + 'px JetBrains Mono';
+    ctx.fillText(txt, x0 + w / 2, y + 1);
+    ctx.restore();
+    return { w, h, x0 };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCENE INITIALIZATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  function seedIntro() {
+    const pts = [];
+    // 3 target blocks × 3 points arranged neatly on the right
+    for (let i = 0; i < 9; i++) {
+      pts.push({
+        rx: 0.12 + Math.random() * 0.34, ry: 0.18 + Math.random() * 0.64,
+        block: Math.floor(i / 3)
+      });
+    }
+    customState.pts = pts; customState.asm = 0;
+  }
+
+  function initScene(slideIndex) {
+    shockwaves = []; sparks = []; customState = {};
+    const mode = slidesData[slideIndex].mode;
+
+    if (mode === 'intro') seedIntro();
+    else if (mode === 'bibd_def') { customState.hl = 0; customState.pair = [1, 3]; }
+    else if (mode === 'params') { customState.reveal = 0; }
+    else if (mode === 'relations') { customState.countT = 0; }
+    else if (mode === 'fisher') { customState.grow = 0; }
+    else if (mode === 'fano') { customState.lineT = 0; customState.activeLine = 0; }
+    else if (mode === 'symmetric') { customState.n = 2; customState.reveal = 0; }
+    else if (mode === 'steiner') { customState.v = 7; customState.reveal = 0; }
+    else if (mode === 'kirkman') { customState.day = 0; customState.morph = 1; }
+    else if (mode === 'existence') { customState.checkT = 0; }
+    else if (mode === 'applications') { customState.t = 0; }
+    else if (mode === 'simulator') { customState.t = 0; customState.ca = buildCA(SIM_VALS); }
+
+    renderHUDControls(slideIndex);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HUD CONTROLS
+  // ═══════════════════════════════════════════════════════════════════════════
+  function renderHUDControls(slideIndex) {
+    const hudGroup = document.getElementById('hud-actions');
+    const dockGroup = document.getElementById('interactive-dock');
+    hudGroup.innerHTML = ''; dockGroup.innerHTML = '';
+    const mode = slidesData[slideIndex].mode;
+
+    const hudBtn = (html, onclick) => {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn'; b.innerHTML = html; b.onclick = onclick;
+      hudGroup.appendChild(b);
+    };
+
+    if (mode === 'intro') {
+      hudBtn('🎲 Пересобрать', () => { seedIntro(); });
+    } else if (mode === 'bibd_def') {
+      hudBtn('✨ Подсветить пару', () => {
+        // pick a fresh pair of points that share exactly λ=1 block in Fano
+        const a = Math.floor(Math.random() * 7);
+        let b = Math.floor(Math.random() * 7); while (b === a) b = Math.floor(Math.random() * 7);
+        customState.pair = [a, b]; customState.hl = 0;
+      });
+    } else if (mode === 'params') {
+      hudBtn('🔢 Перестроить', () => { customState.reveal = 0; });
+    } else if (mode === 'relations') {
+      hudBtn('🔢 Пересчитать', () => { customState.countT = 0; });
+    } else if (mode === 'fisher') {
+      hudBtn('📊 Заново', () => { customState.grow = 0; });
+    } else if (mode === 'fano') {
+      hudBtn('▶ Прогнать прямые', () => { customState.lineT = 0; customState.activeLine = 0; });
+    } else if (mode === 'symmetric') {
+      hudBtn('⟳ n + 1', () => { customState.n = customState.n >= 4 ? 2 : customState.n + 1; customState.reveal = 0; });
+    } else if (mode === 'steiner') {
+      hudBtn('⟳ v: 7 ↔ 9', () => { customState.v = customState.v === 7 ? 9 : 7; customState.reveal = 0; });
+    } else if (mode === 'kirkman') {
+      hudBtn('📅 Следующий день', () => { customState.day = (customState.day + 1) % 7; customState.morph = 0; });
+    } else if (mode === 'existence') {
+      hudBtn('🔍 Проверить (43,7,1)', () => { customState.checkT = 0; });
+    } else if (mode === 'simulator') {
+      hudBtn('🎲 Другой набор', () => { customState.ca = buildCA(SIM_VALS); customState.t = 0; });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN LOOP
+  // ═══════════════════════════════════════════════════════════════════════════
+  function animate() {
+    requestAnimationFrame(animate);
+    animTime += 0.016;
+    ctx.clearRect(0, 0, width, height);
+    drawBackgroundGrid();
+
+    const mode = slidesData[currentSlide].mode;
+    if (mode === 'intro') renderIntro();
+    else if (mode === 'bibd_def') renderBibdDef();
+    else if (mode === 'params') renderParams();
+    else if (mode === 'relations') renderRelations();
+    else if (mode === 'fisher') renderFisher();
+    else if (mode === 'fano') renderFano();
+    else if (mode === 'symmetric') renderSymmetric();
+    else if (mode === 'steiner') renderSteiner();
+    else if (mode === 'kirkman') renderKirkman();
+    else if (mode === 'existence') renderExistence();
+    else if (mode === 'applications') renderApplications();
+    else if (mode === 'simulator') renderSimulator();
+
+    renderEffects();
+  }
+
+  function drawBackgroundGrid() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.05)';
+    ctx.lineWidth = 1;
+    const step = 44;
+    for (let x = 0; x < width; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+    for (let y = 0; y < height; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // Fano point layout given center + radius → array of {x,y}
+  function fanoPoints(cx, cy, R) {
+    const A = { x: cx, y: cy - R };
+    const B = { x: cx - R * 0.866, y: cy + R * 0.5 };
+    const C = { x: cx + R * 0.866, y: cy + R * 0.5 };
+    const F = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
+    const D = { x: (B.x + C.x) / 2, y: (B.y + C.y) / 2 };
+    const E = { x: (C.x + A.x) / 2, y: (C.y + A.y) / 2 };
+    const G = { x: cx, y: cy };
+    return [A, B, C, F, D, E, G];
+  }
+
+  // ── Scene 1: intro (chaos → blocks) ──
+  function renderIntro() {
+    customState.asm = Math.min(1, (customState.asm || 0) + 0.006);
+    const a = customState.asm;
+    const ease = a < 0.5 ? 2 * a * a : 1 - Math.pow(-2 * a + 2, 2) / 2;
+    const pts = customState.pts;
+    const blockColors = [CY, VIO, GOLD];
+    // target positions: 3 blocks stacked on the right
+    const bx = width * 0.72;
+    const target = pts.map((p, i) => {
+      const bi = p.block, within = i % 3;
+      const by = height * (0.27 + bi * 0.23);
+      const ang = -Math.PI / 2 + within / 3 * Math.PI * 2;
+      return { x: bx + Math.cos(ang) * 52, y: by + Math.sin(ang) * 40 };
+    });
+
+    // block ovals appear as points settle
+    if (a > 0.55) {
+      for (let bi = 0; bi < 3; bi++) {
+        const by = height * (0.27 + bi * 0.23);
+        ctx.save();
+        ctx.globalAlpha = Math.min(0.5, (a - 0.55) * 2);
+        ctx.strokeStyle = blockColors[bi]; ctx.lineWidth = 2; ctx.setLineDash([7, 7]);
+        ctx.beginPath(); ctx.ellipse(bx, by, 82, 62, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+        label('блок ' + (bi + 1), bx + 96, by, blockColors[bi], 12, 800, 'left');
+      }
+    }
+
+    pts.forEach((p, i) => {
+      const sx = p.rx * width, sy = p.ry * height;
+      const x = sx + (target[i].x - sx) * ease;
+      const y = sy + (target[i].y - sy) * ease;
+      const col = a > 0.5 ? blockColors[p.block] : GOLD;
+      dot(x, y, 8, col, 12);
+    });
+
+    label(a < 0.6 ? 'набор точек' : 'набор → структура', width * 0.30, height * 0.10, GOLD, 14, 800);
+    formula('множество  +  семья блоков  =  баланс', width * 0.5, height * 0.80,VIO, 15);
+    if (a < 0.5) label('хаос', width * 0.28, height * 0.5, MUT, 13, 700);
+  }
+
+  // ── Scene 2: BIBD definition (Fano points + blocks, highlight a pair) ──
+  function renderBibdDef() {
+    customState.hl = Math.min(1, (customState.hl || 0) + 0.02);
+    const cx = width * 0.46, cy = height * 0.50, R = Math.min(width, height) * 0.26;
+    const P = fanoPoints(cx, cy, R);
+    const [pa, pb] = customState.pair;
+
+    // find the (single) block containing both pa & pb
+    let hlLine = -1;
+    FANO_LINES.forEach((ln, li) => { if (ln.includes(pa) && ln.includes(pb)) hlLine = li; });
+
+    // draw all blocks faintly, highlight the one holding the pair
+    FANO_LINES.forEach((ln, li) => {
+      const on = li === hlLine;
+      const col = on ? VIO : 'rgba(120,140,160,0.16)';
+      drawFanoLine(P, ln, li, col, on ? 3 : 1.5, on ? 14 : 0);
+    });
+
+    // points
+    P.forEach((p, i) => {
+      const isPair = i === pa || i === pb;
+      dot(p.x, p.y, isPair ? 11 : 8, isPair ? VIO : GOLD, isPair ? 18 : 8);
+      label(String(i + 1), p.x, p.y - 20, isPair ? '#fff' : MUT, 12, 800);
+    });
+
+    // rules panel (right)
+    const rx = width * 0.80, ry0 = height * 0.22;
+    const rules = [
+      ['v', 'точек всего', GOLD],
+      ['k', 'точек в блоке', CY],
+      ['r', 'блоков через точку', EM],
+      ['λ', 'блоков на пару', VIO]
+    ];
+    rules.forEach((rl, i) => {
+      const y = ry0 + i * 46;
+      formula(rl[0], rx - 78, y, rl[2], 17, { align: 'left', glow: 8 });
+      label(rl[1], rx - 30, y, '#cdd8e0', 12, 700, 'left');
+    });
+
+    formula('2-(v, k, λ)', width * 0.5, height * 0.80,CY, 17);
+    label('подсвечена пара ' + (pa + 1) + '·' + (pb + 1) + ' → она в λ = 1 блоке', width / 2, height * 0.10, VIO, 13, 800);
+  }
+
+  function drawFanoLine(P, ln, li, color, w, glow) {
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = w;
+    if (glow) { ctx.shadowColor = color; ctx.shadowBlur = glow; }
+    if (li === 6) {
+      // the circle through midpoints F(3),D(4),E(5)
+      const cx = (P[3].x + P[4].x + P[5].x) / 3, cy = (P[3].y + P[4].y + P[5].y) / 3;
+      const rad = Math.hypot(P[4].x - cx, P[4].y - cy);
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(P[ln[0]].x, P[ln[0]].y);
+      ctx.lineTo(P[ln[1]].x, P[ln[1]].y);
+      ctx.lineTo(P[ln[2]].x, P[ln[2]].y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── Scene 3: params — incidence matrix of (7,3,1) ──
+  function renderParams() {
+    customState.reveal = Math.min(1, (customState.reveal || 0) + 0.02);
+    const rv = customState.reveal;
+    const v = 7, b = 7, k = 3, r = 3;
+    // matrix grid
+    const gx = width * 0.30, gy = height * 0.26, cell = Math.min(width, height) * 0.072;
+    const gw = b * cell, gh = v * cell;
+
+    label('матрица инцидентности  ·  точки × блоки', gx + gw / 2, gy - 34, CY, 13, 800);
+
+    // column headers (blocks) + row headers (points)
+    for (let c = 0; c < b; c++) mono('B' + (c + 1), gx + c * cell + cell / 2, gy - 14, CY, 11, 'center');
+    for (let rI = 0; rI < v; rI++) mono('' + (rI + 1), gx - 16, gy + rI * cell + cell / 2, GOLD, 12, 'center');
+
+    // grid + cells
+    for (let rI = 0; rI < v; rI++) {
+      for (let c = 0; c < b; c++) {
+        const on = FANO_LINES[c].includes(rI);
+        const x = gx + c * cell, y = gy + rI * cell;
+        ctx.save();
+        rr(x + 2, y + 2, cell - 4, cell - 4, 5);
+        const seq = (rI + c) / (v + b);
+        const shown = rv > seq;
+        if (on && shown) {
+          ctx.fillStyle = 'rgba(34,211,238,0.9)'; ctx.shadowColor = CY; ctx.shadowBlur = 10; ctx.fill();
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
+          ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(148,163,184,0.14)'; ctx.stroke();
+        }
+        ctx.restore();
+        if (on && shown) mono('1', x + cell / 2, y + cell / 2, '#04141a', 12, 'center');
+      }
+    }
+
+    // parameter chips on the right
+    const px = width * 0.80;
+    const params = [['v = 7', GOLD, 'точек'], ['b = 7', CY, 'блоков'], ['r = 3', EM, 'через точку'], ['k = 3', BLUE, 'в блоке'], ['λ = 1', VIO, 'на пару']];
+    params.forEach((p, i) => {
+      const y = height * 0.24 + i * 52;
+      formula(p[0], px, y, p[1], 16, { align: 'left', glow: 8 });
+      label(p[2], px + 96, y, '#aebfca', 11.5, 700, 'left');
+    });
+
+    formula('запись:  2-(7, 3, 1)', width * 0.5, height * 0.13, VIO, 16);
+    label('в каждой строке ровно r=3, в каждом столбце ровно k=3', width * 0.5, height * 0.80, EM, 12.5, 800);
+  }
+
+  // ── Scene 4: relations — double counting → two laws ──
+  function renderRelations() {
+    customState.countT = Math.min(1, (customState.countT || 0) + 0.006);
+    const t = customState.countT;
+
+    // small incidence lattice: v points (left) linked to b blocks (right) — count flags
+    const v = 7, b = 7, k = 3, r = 3;
+    const lx = width * 0.16, rx = width * 0.52;
+    const py0 = height * 0.18, pystep = (height * 0.64) / (v - 1);
+
+    // draw points and blocks columns
+    for (let i = 0; i < v; i++) {
+      const y = py0 + i * pystep;
+      dot(lx, y, 6, GOLD, 8);
+    }
+    for (let j = 0; j < b; j++) {
+      const y = py0 + j * pystep;
+      dot(rx, y, 6, CY, 8);
+    }
+    label('точки (v)', lx, py0 - 26, GOLD, 12, 800);
+    label('блоки (b)', rx, py0 - 26, CY, 12, 800);
+
+    // flags = incidences (point in block). Reveal progressively.
+    let flags = 0;
+    FANO_LINES.forEach((ln, j) => {
+      const by = py0 + j * pystep;
+      ln.forEach(pi => {
+        const seq = flags / 21;
+        flags++;
+        if (t * 1.05 < seq) return;
+        const py = py0 + pi * pystep;
+        line(lx, py, rx, by, 'rgba(16,185,129,0.28)', 1.4);
+      });
+    });
+
+    label('инцидентностей «точка ∈ блок»: ' + Math.min(21, Math.round(t * 21)) + ' / 21', width * 0.34, height * 0.80,EM, 13, 800);
+
+    // the two laws (right)
+    const fx = width * 0.80;
+    formula('b · k = v · r', fx, height * 0.30, EM, 18, { glow: 14 });
+    label('считаем инцидентности дважды', fx, height * 0.30 + 34, '#aebfca', 11.5, 700);
+    formula('λ (v−1) = r (k−1)', fx, height * 0.52, VIO, 18, { glow: 14 });
+    label('считаем пары вокруг точки', fx, height * 0.52 + 34, '#aebfca', 11.5, 700);
+
+    // live check for (7,3,1)
+    if (t > 0.9) {
+      formula('7·3 = 7·3 = 21  ✓', fx, height * 0.70, CY, 14, { glow: 10 });
+      formula('1·6 = 3·2 = 6  ✓', fx, height * 0.80, CY, 14, { glow: 10 });
+    }
+  }
+
+  // ── Scene 5: Fisher inequality b ≥ v ──
+  function renderFisher() {
+    customState.grow = Math.min(1, (customState.grow || 0) + 0.012);
+    const g = customState.grow;
+    const baseY = height * 0.78, maxH = height * 0.5;
+    const bx1 = width * 0.34, bx2 = width * 0.56, bw = width * 0.12;
+
+    // v column
+    const vH = maxH * 0.7 * g;
+    ctx.save();
+    rr(bx1 - bw / 2, baseY - vH, bw, vH, 10);
+    ctx.fillStyle = 'rgba(251,191,36,0.28)'; ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
+    ctx.shadowColor = GOLD; ctx.shadowBlur = 14; ctx.fill(); ctx.stroke();
+    ctx.restore();
+    label('v', bx1, baseY + 22, GOLD, 18, 900);
+    label('точки', bx1, baseY + 42, MUT, 12, 700);
+
+    // b column — always ≥ v
+    const bH = maxH * (0.7 + 0.28 * (0.5 + 0.5 * Math.sin(animTime))) * g;
+    ctx.save();
+    rr(bx2 - bw / 2, baseY - bH, bw, bH, 10);
+    ctx.fillStyle = 'rgba(34,211,238,0.28)'; ctx.strokeStyle = CY; ctx.lineWidth = 2;
+    ctx.shadowColor = CY; ctx.shadowBlur = 14; ctx.fill(); ctx.stroke();
+    ctx.restore();
+    label('b', bx2, baseY + 22, CY, 18, 900);
+    label('блоки', bx2, baseY + 42, MUT, 12, 700);
+
+    // "floor" line at v height showing b never drops below
+    line(bx1 - bw / 2 - 10, baseY - vH, bx2 + bw / 2 + 10, baseY - vH, 'rgba(251,191,36,0.5)', 1.5, [6, 6]);
+
+    formula('b  ≥  v', width * 0.5, height * 0.16, CY, 26, { glow: 18 });
+    label('блоков всегда не меньше, чем точек — неравенство Фишера', width * 0.5, height * 0.80,EM, 13, 800);
+    label('равенство b = v  →  симметричная схема', width * 0.72, height * 0.30, VIO, 13, 800);
+  }
+
+  // ── Scene 6: Fano plane hero ──
+  function renderFano() {
+    const cx = width * 0.46, cy = height * 0.50, R = Math.min(width, height) * 0.30;
+    const P = fanoPoints(cx, cy, R);
+
+    customState.lineT = (customState.lineT || 0) + 0.006;
+    if (customState.lineT >= 1) { customState.lineT = 0; customState.activeLine = (customState.activeLine + 1) % 7; }
+    const act = customState.activeLine;
+
+    // draw all lines faint
+    FANO_LINES.forEach((ln, li) => drawFanoLine(P, ln, li, 'rgba(120,150,170,0.22)', 2, 0));
+    // highlight active line
+    drawFanoLine(P, FANO_LINES[act], act, CY, 3.5, 16);
+
+    // points
+    P.forEach((p, i) => {
+      const on = FANO_LINES[act].includes(i);
+      dot(p.x, p.y, on ? 11 : 8, on ? CY : GOLD, on ? 18 : 9);
+      label(String(i + 1), p.x + 16, p.y - 14, on ? '#fff' : MUT, 12, 800);
+    });
+
+    // active block readout
+    const ln = FANO_LINES[act];
+    formula('прямая ' + (act + 1) + ' = { ' + (ln[0]+1) + ', ' + (ln[1]+1) + ', ' + (ln[2]+1) + ' }', width * 0.5, height * 0.80,CY, 16);
+    label('7 точек · 7 прямых · по 3 точки на прямой', width * 0.5, height * 0.10, GOLD, 13, 800);
+
+    // identity chips (right)
+    const ix = width * 0.85;
+    formula('BIBD (7,3,1)', ix, height * 0.30, CY, 13, { align: 'right', glow: 8 });
+    formula('проектив. плоскость n=2', ix, height * 0.42, VIO, 13, { align: 'right', glow: 8 });
+    formula('S(2,3,7) Штейнер', ix, height * 0.54, GOLD, 13, { align: 'right', glow: 8 });
+  }
+
+  // ── Scene 7: symmetric designs + projective plane formula ──
+  function renderSymmetric() {
+    customState.reveal = Math.min(1, (customState.reveal || 0) + 0.02);
+    const n = customState.n;
+    const v = n * n + n + 1, k = n + 1;
+
+    // square incidence matrix v×v
+    const size = Math.min(width * 0.42, height * 0.62);
+    const gx = width * 0.30 - size / 2 + width * 0.02, gy = height * 0.5 - size / 2;
+    const cell = size / v;
+    label('матрица инцидентности  b = v  (квадрат ' + v + '×' + v + ')', gx + size / 2, gy - 26, CY, 12.5, 800);
+    // deterministic-ish pattern (cyclic difference set feel) just for the visual
+    for (let rI = 0; rI < v; rI++) {
+      for (let c = 0; c < v; c++) {
+        const on = ((rI * 1 + c * (n)) % v) < k; // pseudo pattern, k ones per row
+        const x = gx + c * cell, y = gy + rI * cell;
+        ctx.save();
+        rr(x + 1, y + 1, cell - 2, cell - 2, 3);
+        if (on) { ctx.fillStyle = 'rgba(34,211,238,0.85)'; ctx.shadowColor = CY; ctx.shadowBlur = 6; ctx.fill(); }
+        else { ctx.fillStyle = 'rgba(255,255,255,0.035)'; ctx.fill(); }
+        ctx.restore();
+      }
+    }
+
+    // formulas on the right
+    const fx = width * 0.80;
+    formula('b = v   ⇒   r = k', fx, height * 0.24, VIO, 17, { glow: 12 });
+    formula('v = b = n²+n+1', fx, height * 0.40, GOLD, 17, { glow: 12 });
+    formula('k = r = n + 1', fx, height * 0.52, CY, 16, { glow: 10 });
+    formula('n = ' + n + '  →  v = ' + v, fx, height * 0.66, EM, 16, { glow: 12 });
+    label('два блока пересекаются ровно в λ точках', fx, height * 0.78, '#c084fc', 12.5, 800);
+
+    label('симметричные схемы · проективные плоскости (λ=1)', width * 0.5, height * 0.80,VIO, 13, 800);
+  }
+
+  // ── Scene 8: Steiner triple systems + t-designs ──
+  function renderSteiner() {
+    customState.reveal = Math.min(1, (customState.reveal || 0) + 0.015);
+    const v = customState.v;
+    const cx = width * 0.44, cy = height * 0.50, R = Math.min(width, height) * 0.30;
+
+    // points on a circle
+    const P = [];
+    for (let i = 0; i < v; i++) {
+      const ang = -Math.PI / 2 + i / v * Math.PI * 2;
+      P.push({ x: cx + Math.cos(ang) * R, y: cy + Math.sin(ang) * R });
+    }
+    // triples: for v=7 use Fano lines; for v=9 use affine plane AG(2,3) (12 lines)
+    let triples;
+    if (v === 7) triples = FANO_LINES.map(l => l.slice());
+    else triples = STS9;
+
+    triples.forEach((tr, ti) => {
+      const appear = customState.reveal * triples.length;
+      if (ti > appear) return;
+      const hue = ti / triples.length;
+      const col = ti === Math.floor(appear) ? '#fff' : `hsla(${180 + hue * 160},70%,60%,0.5)`;
+      ctx.save();
+      ctx.strokeStyle = col; ctx.lineWidth = ti === Math.floor(appear) ? 3 : 1.6;
+      if (ti === Math.floor(appear)) { ctx.shadowColor = CY; ctx.shadowBlur = 12; }
+      ctx.beginPath();
+      ctx.moveTo(P[tr[0]].x, P[tr[0]].y);
+      ctx.lineTo(P[tr[1]].x, P[tr[1]].y);
+      ctx.lineTo(P[tr[2]].x, P[tr[2]].y);
+      ctx.closePath(); ctx.stroke();
+      ctx.restore();
+    });
+    P.forEach((p, i) => { dot(p.x, p.y, 8, GOLD, 10); label(String(i + 1), p.x, p.y, '#04141a', 10, 800); });
+
+    // formulas
+    const fx = width * 0.83;
+    formula('S(2, 3, ' + v + ')', fx, height * 0.26, GOLD, 18, { align: 'right', glow: 12 });
+    label('каждая пара — ровно в 1 тройке', fx, height * 0.26 + 34, '#aebfca', 11.5, 700, 'right');
+    formula('t-(v, k, λ)', fx, height * 0.46, VIO, 17, { align: 'right', glow: 12 });
+    label('каждое t-подмн. — в λ блоках', fx, height * 0.46 + 34, '#c084fc', 11.5, 700, 'right');
+    formula('t-схема (t≥2) ⇒ 2-схема', fx, height * 0.64, CY, 13, { align: 'right', glow: 10 });
+    label('троек: ' + triples.length + '  ·  ' + (v === 7 ? 'плоскость Фано' : 'аффинная плоскость AG(2,3)'), width * 0.44, height * 0.80,CY, 12.5, 800);
+    label('S(2,3,v) существует при v ≡ 1, 3 (mod 6):  7, 9, 13, 15…', width * 0.44, height * 0.10, GOLD, 12.5, 800);
+  }
+
+  // Steiner triple system on 9 points (affine plane AG(2,3)): 12 lines
+  const STS9 = [
+    [0,1,2],[3,4,5],[6,7,8],   // rows
+    [0,3,6],[1,4,7],[2,5,8],   // cols
+    [0,4,8],[1,5,6],[2,3,7],   // diag ↘
+    [0,5,7],[1,3,8],[2,4,6]    // diag ↙
+  ];
+
+  // ── Scene 9: Kirkman schoolgirls (resolvable 2-(15,3,1)) ──
+  const KIRKMAN = [ // 7 days × 5 triples, girls 1..15 (stored 0-based)
+    [[0,1,2],[3,7,11],[4,9,14],[5,10,12],[6,8,13]],
+    [[0,3,4],[1,7,9],[2,12,13],[5,8,14],[6,10,11]],
+    [[0,5,6],[1,8,10],[2,11,14],[3,9,12],[4,7,13]],
+    [[0,7,8],[1,11,13],[2,4,5],[3,10,14],[6,9,12]],
+    [[0,9,10],[1,12,14],[2,3,6],[4,8,11],[5,7,13]],
+    [[0,11,12],[1,3,5],[2,8,9],[4,10,13],[6,7,14]],
+    [[0,13,14],[1,4,6],[2,7,10],[3,5,8],[9,11,12]]
+  ];
+
+  function renderKirkman() {
+    customState.morph = Math.min(1, (customState.morph || 0) + 0.03);
+    const day = customState.day;
+    const cx = width * 0.44, cy = height * 0.50, R = Math.min(width, height) * 0.32;
+    // 15 girls on a circle
+    const P = [];
+    for (let i = 0; i < 15; i++) {
+      const ang = -Math.PI / 2 + i / 15 * Math.PI * 2;
+      P.push({ x: cx + Math.cos(ang) * R, y: cy + Math.sin(ang) * R });
+    }
+    const classColors = [CY, VIO, GOLD, EM, MAG];
+    KIRKMAN[day].forEach((tr, ci) => {
+      const col = classColors[ci];
+      ctx.save();
+      ctx.globalAlpha = customState.morph;
+      ctx.strokeStyle = col; ctx.lineWidth = 2.4; ctx.shadowColor = col; ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(P[tr[0]].x, P[tr[0]].y);
+      ctx.lineTo(P[tr[1]].x, P[tr[1]].y);
+      ctx.lineTo(P[tr[2]].x, P[tr[2]].y);
+      ctx.closePath(); ctx.stroke();
+      // fill light
+      ctx.globalAlpha = 0.10 * customState.morph; ctx.fillStyle = col; ctx.fill();
+      ctx.restore();
+    });
+    // color each girl by her triple this day
+    const colorOf = {};
+    KIRKMAN[day].forEach((tr, ci) => tr.forEach(g => colorOf[g] = classColors[ci]));
+    P.forEach((p, i) => { dot(p.x, p.y, 9, colorOf[i] || GOLD, 12); label(String(i + 1), p.x, p.y, '#04141a', 10, 800); });
+
+    // day tabs
+    for (let d = 0; d < 7; d++) {
+      const tx = width * 0.12 + d * 34;
+      const on = d === day;
+      ctx.save();
+      rr(tx - 14, height * 0.08 - 12, 28, 24, 6);
+      ctx.fillStyle = on ? 'rgba(245,158,11,0.9)' : 'rgba(255,255,255,0.06)';
+      ctx.strokeStyle = on ? AMB : 'rgba(148,163,184,0.3)'; ctx.lineWidth = 1.5;
+      if (on) { ctx.shadowColor = AMB; ctx.shadowBlur = 10; }
+      ctx.fill(); ctx.stroke(); ctx.restore();
+      mono(String(d + 1), tx, height * 0.08, on ? '#04141a' : '#8fa3b3', 12, 'center');
+    }
+    label('день', width * 0.12 - 40, height * 0.08, AMB, 12, 800, 'center');
+
+    // formulas
+    const fx = width * 0.85;
+    formula('2-(15, 3, 1)', fx, height * 0.28, AMB, 17, { align: 'right', glow: 12 });
+    formula('b = 35 = 7 × 5', fx, height * 0.42, CY, 15, { align: 'right', glow: 10 });
+    formula('b ≥ v + c − 1', fx, height * 0.56, VIO, 15, { align: 'right', glow: 10 });
+    label('день ' + (day + 1) + ' из 7 · 5 троек без пересечений', width * 0.44, height * 0.80,AMB, 13, 800);
+    label('параллельный класс = разбиение всех 15 девочек', width * 0.44, height * 0.10, EM, 12.5, 800);
+  }
+
+  // ── Scene 10: existence (BRC) ──
+  function renderExistence() {
+    customState.checkT = Math.min(1, (customState.checkT || 0) + 0.01);
+    const t = customState.checkT;
+    const rows = [
+      { p: '(7, 3, 1)',  ok: true,  note: 'плоскость Фано' },
+      { p: '(15, 3, 1)', ok: true,  note: 'Киркман' },
+      { p: '(11, 5, 2)', ok: true,  note: 'биплан (Пэли)' },
+      { p: '(43, 7, 1)', ok: false, note: 'НЕ существует (Брук–Райзер–Чоула)' }
+    ];
+    const x0 = width * 0.10, y0 = height * 0.22, rowH = height * 0.13, w = width * 0.44;
+    label('параметры, проходящие арифметику…', x0, y0 - 30, CY, 13, 800, 'left');
+    rows.forEach((r, i) => {
+      const y = y0 + i * rowH;
+      const col = r.ok ? EM : RED;
+      ctx.save();
+      rr(x0, y, w, rowH - 14, 10);
+      ctx.fillStyle = r.ok ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.10)';
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.shadowColor = col; ctx.shadowBlur = 8; ctx.fill(); ctx.stroke();
+      ctx.restore();
+      mono(r.p, x0 + 18, y + (rowH - 14) / 2, col, 16, 'left');
+      label(r.note, x0 + 150, y + (rowH - 14) / 2, '#cdd8e0', 12, 700, 'left');
+      label(r.ok ? '✓' : '✗', x0 + w - 26, y + (rowH - 14) / 2, col, 22, 900);
+    });
+
+    // spotlight the (43,7,1) arithmetic on the right
+    const fx = width * 0.78;
+    label('(43, 7, 1): арифметика сходится…', fx, height * 0.24, '#e5edf2', 13, 800);
+    if (t > 0.3) formula('b·k = 43·7 = v·r = 301 ✓', fx, height * 0.38, EM, 14, { glow: 10 });
+    if (t > 0.55) formula('λ(v−1)=42 = r(k−1)=42 ✓', fx, height * 0.50, EM, 14, { glow: 10 });
+    if (t > 0.8) {
+      formula('…но схемы НЕТ', fx, height * 0.66, RED, 17, { glow: 16 });
+      label('теорема Брука–Райзера–Чоула', fx, height * 0.74, '#f6b9b9', 12, 800);
+      if (!customState._boom) { addShockwave(fx, height * 0.66, RED, 90); customState._boom = true; }
+    } else customState._boom = false;
+
+    label('законы + Фишер — необходимы, но НЕ достаточны', width * 0.5, height * 0.80,AMB, 13, 800);
+  }
+
+  // ── Scene 11: applications hub ──
+  function renderApplications() {
+    customState.t = Math.min(1, (customState.t || 0) + 0.01);
+    const cx = width * 0.44, cy = height * 0.50;
+
+    const apps = [
+      { icon: '🧪', t: 'Планирование', s: 'эксперимента', color: EM,   ang: -Math.PI / 2 },
+      { icon: '📡', t: 'Помехоустойч.', s: 'коды', color: VIO,  ang: -Math.PI / 2 + Math.PI * 2 / 5 },
+      { icon: '📐', t: 'Конечная', s: 'геометрия', color: CY,   ang: -Math.PI / 2 + Math.PI * 4 / 5 },
+      { icon: '🔲', t: 'Латинские', s: 'квадраты', color: GOLD, ang: -Math.PI / 2 + Math.PI * 6 / 5 },
+      { icon: '🧷', t: 'Тестирование', s: 'ПО (pairwise)', color: AMB, ang: -Math.PI / 2 + Math.PI * 8 / 5 }
+    ];
+    const R = Math.min(width, height) * 0.32;
+    apps.forEach(ap => {
+      const x = cx + Math.cos(ap.ang) * R, y = cy + Math.sin(ap.ang) * R * 0.86;
+      line(cx, cy, x, y, 'rgba(148,163,184,0.2)', 1.5, [5, 5]);
+      flowDots(cx, cy, x, y, ap.color, 0.4, 2, 3);
+      box(x - 82, y - 30, 164, 60, ap.color, '', '', { glow: 10 });
+      label(ap.icon, x - 58, y, ap.color, 20);
+      label(ap.t, x + 14, y - 8, '#fff', 12.5, 800);
+      label(ap.s, x + 14, y + 10, ap.color, 11, 700);
+    });
+
+    // center: incidence matrix icon
+    ctx.save(); ctx.fillStyle = 'rgba(168,85,247,0.10)'; ctx.beginPath(); ctx.arc(cx, cy, 56, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    box(cx - 52, cy - 42, 104, 84, VIO, '', '', { glow: 20 });
+    label('▦', cx, cy - 10, '#fff', 30);
+    label('матрица', cx, cy + 16, VIO, 11.5, 800);
+    label('инцидентности', cx, cy + 31, VIO, 10.5, 700);
+
+    // the sunscreen BIBD example chip
+    formula('пример: v=3, k=2, λ=1  →  b=3, r=2', width * 0.5, height * 0.80,EM, 15);
+    label('баланс порождает структуру', width * 0.5, height * 0.10, GOLD, 14, 800);
+  }
+
+  // small right-pointing arrowhead at (x,y)
+  function arrow(x, y, color) {
+    ctx.save(); ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 10, y - 5); ctx.lineTo(x - 10, y + 5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Scene 12: how we apply it in simulator (pairwise / covering array) ──
+  function renderSimulator() {
+    customState.t = Math.min(1, (customState.t || 0) + 0.006);
+    const t = customState.t;
+    const ca = customState.ca || [];
+    const runs = ca.length;
+    const full = SIM_VALS.reduce((a, b) => a * b, 1);
+    const valColors = [CY, VIO, GOLD, EM, MAG];
+
+    label('как мы: комбинаторное тестирование графов simulator', width / 2, height * 0.075, EM, 14, 800);
+
+    // ── process graph (конструктор-стиль) ──
+    const gy = height * 0.21;
+    const nodes = [
+      { x: width * 0.15, ty: 'START', t: 'Старт',     color: EM },
+      { x: width * 0.38, ty: 'LOGIC', t: 'Условие',   color: CY },
+      { x: width * 0.61, ty: 'API',   t: 'API-вызов', color: VIO },
+      { x: width * 0.83, ty: 'REPLY', t: 'Ответ',     color: GOLD }
+    ];
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const a = nodes[i], b = nodes[i + 1];
+      line(a.x + 78, gy, b.x - 82, gy, 'rgba(148,163,184,0.35)', 2);
+      arrow(b.x - 80, gy, 'rgba(180,200,215,0.7)');
+      for (let r = 0; r < Math.min(runs, 5); r++) {
+        const off = (animTime * 0.35 + r / 5 + i * 0.04) % 1;
+        const x = a.x + 78 + (b.x - 82 - (a.x + 78)) * off;
+        dot(x, gy, 4, valColors[r % valColors.length], 8);
+      }
+    }
+    nodes.forEach(n => {
+      const w = 156, h = 64;
+      box(n.x - w / 2, gy - h / 2, w, h, n.color, '', '', { glow: 12, bg: 'rgba(9,17,26,0.96)' });
+      ctx.save();
+      rr(n.x - w / 2 + 12, gy - h / 2 + 9, 60, 17, 5);
+      ctx.fillStyle = n.color; ctx.globalAlpha = 0.9; ctx.fill(); ctx.restore();
+      mono(n.ty, n.x - w / 2 + 42, gy - h / 2 + 17, '#04141a', 8.5, 'center');
+      dot(n.x + w / 2 - 15, gy - h / 2 + 17, 4, n.color, 8);
+      label(n.t, n.x, gy + 9, '#fff', 13, 800);
+    });
+    label('у графа много «ручек»: ветки · таймауты · ретраи · входные данные', width / 2, height * 0.33, MUT, 11.5, 700);
+
+    // ── covering array matrix ──
+    const cols = SIM_VALS.length;
+    const gx = width * 0.29;
+    const cellW = width * 0.072;
+    const my = height * 0.42;
+    const cellH = Math.min(28, (height * 0.40) / Math.max(runs, 1));
+    label('покрывающий массив · строка = прогон графа', gx, my - 22, CY, 12, 800, 'left');
+    for (let c = 0; c < cols; c++) mono('P' + (c + 1), gx + c * cellW + cellW / 2, my - 4, CY, 10, 'center');
+    ca.forEach((row, r) => {
+      if (r > t * runs) return;
+      const y = my + 8 + r * cellH;
+      row.forEach((val, c) => {
+        const x = gx + c * cellW;
+        const col = valColors[val % valColors.length];
+        ctx.save();
+        rr(x + 3, y + 2, cellW - 6, cellH - 4, 5);
+        ctx.fillStyle = col; ctx.globalAlpha = 0.85; ctx.shadowColor = col; ctx.shadowBlur = 6; ctx.fill();
+        ctx.restore();
+        mono('v' + (val + 1), x + cellW / 2, y + cellH / 2, '#04141a', 9.5, 'center');
+      });
+    });
+
+    // ── numbers (right) ──
+    const fx = width * 0.845;
+    formula('перебор: ' + full, fx, height * 0.44, RED, 15, { glow: 12 });
+    label(SIM_VALS.join(' · ') + ' сочетаний', fx, height * 0.44 + 30, '#f6b9b9', 10.5, 700);
+    formula('pairwise: ' + runs, fx, height * 0.58, EM, 17, { glow: 14 });
+    label('прогонов графа', fx, height * 0.58 + 30, '#a7e5ce', 10.5, 700);
+    formula('экономия ×' + (full / Math.max(runs, 1)).toFixed(1), fx, height * 0.70, GOLD, 14, { glow: 12 });
+    label('все пары значений покрыты ✓', fx, height * 0.78, '#bfe9d6', 11.5, 800);
+  }
+
+  // ── Effects ──
+  function renderEffects() {
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const sw = shockwaves[i];
+      sw.radius += (sw.maxRadius - sw.radius) * 0.12; sw.life -= sw.decay;
+      if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
+      ctx.save(); ctx.strokeStyle = sw.color; ctx.globalAlpha = sw.life; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.x += sp.vx; sp.y += sp.vy; sp.life -= sp.decay;
+      if (sp.life <= 0) { sparks.splice(i, 1); continue; }
+      ctx.save(); ctx.fillStyle = sp.color; ctx.globalAlpha = sp.life; ctx.shadowColor = sp.color; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UI & STORY CONTROLLER
+  // ═══════════════════════════════════════════════════════════════════════════
+  const topNav = document.getElementById('top-nav');
+  const deckScroll = document.getElementById('deck-scroll');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  const btnPlay = document.getElementById('btn-play');
+  const btnRestart = document.getElementById('btn-restart');
+  const voiceToggle = document.getElementById('voice-toggle');
+  const progressBar = document.getElementById('progress-bar');
+  const slideCounter = document.getElementById('slide-counter');
+  const captionText = document.getElementById('stage-caption-text');
+  const sceneNote = document.getElementById('stage-scene-note');
+  const btnPresenter = document.getElementById('btn-presenter');
+
+  const storyNavBadges = [];
+  const slideViews = [];
+
+  const LEGENDS = {
+    intro:       [[GOLD, 'точки'], [CY, 'блок'], [VIO, 'баланс = структура']],
+    bibd_def:    [[GOLD, 'точки (v)'], [CY, 'блоки (k, r)'], [VIO, 'пара → λ блоков']],
+    params:      [[CY, '1 — точка в блоке'], [GOLD, 'строка = точка'], [CY, 'столбец = блок']],
+    relations:   [[GOLD, 'точки'], [CY, 'блоки'], [EM, 'инцидентность (флаг)']],
+    fisher:      [[GOLD, 'v — точки'], [CY, 'b — блоки'], [VIO, 'b = v: симметричная']],
+    fano:        [[GOLD, 'точка'], [CY, 'активная прямая'], [MUT, 'прочие прямые']],
+    symmetric:   [[CY, 'инцидентность'], [VIO, 'b=v ⇒ r=k'], [GOLD, 'v=n²+n+1']],
+    steiner:     [[GOLD, 'точки'], [CY, 'тройки-блоки'], [VIO, 't-подмножество']],
+    kirkman:     [[CY, 'класс 1'], [VIO, 'класс 2'], [GOLD, 'класс 3'], [EM, 'класс 4'], [MAG, 'класс 5']],
+    existence:   [[EM, 'существует'], [RED, 'не существует'], [AMB, 'арифметика ✓']],
+    applications:[[VIO, 'матрица инцидентности'], [EM, 'применения'], [GOLD, 'баланс']],
+    simulator:   [[CY, 'значение v1'], [VIO, 'v2'], [GOLD, 'v3'], [EM, 'меньше прогонов — все пары']]
+  };
+  const legendEl = document.getElementById('stage-legend');
+  const stageFade = document.getElementById('stage-fade');
+
+  function updateLegend(index) {
+    const rows = LEGENDS[slidesData[index].mode];
+    if (!rows) { legendEl.style.display = 'none'; return; }
+    legendEl.style.display = 'flex';
+    legendEl.innerHTML = '<div class="legend-title">Обозначения</div>' + rows.map(
+      ([c, l]) => `<div class="legend-item"><span class="legend-dot" style="background:${c};color:${c}"></span>${l}</div>`
+    ).join('');
+  }
+
+  function buildUI() {
+    slidesData.forEach((s, idx) => {
+      if (idx > 0) {
+        const sep = document.createElement('span');
+        sep.className = 'nav-sep'; sep.textContent = '→'; topNav.appendChild(sep);
+      }
+      const b = document.createElement('button');
+      b.className = 'nav-badge' + (idx === 0 ? ' active' : '');
+      b.innerHTML = `<span class="num">${idx + 1}</span><span>${s.storyLabel}</span>`;
+      b.onclick = () => goToSlide(idx, { forceSpeak: voiceToggle.checked });
+      topNav.appendChild(b);
+      storyNavBadges.push(b);
+
+      const slide = document.createElement('div');
+      slide.className = 'slide-view' + (idx === 0 ? ' active' : '');
+      slide.innerHTML = `
+        <div class="slide-tag-line" style="color: ${s.tagColor}">${s.icon} ${s.tag}</div>
+        <h1 class="slide-title">${s.title}</h1>
+        <div class="slide-desc">${s.desc}</div>
+        <div class="callout-box ${s.calloutClass}">${s.callout}</div>
+      `;
+      deckScroll.appendChild(slide);
+      slideViews.push(slide);
+    });
+    updateUI();
+  }
+
+  function goToSlide(index, options = {}) {
+    if (index < 0 || index >= slidesData.length) return;
+    currentSlide = index;
+    if (stageFade) { stageFade.style.transition = 'none'; stageFade.style.opacity = '1'; }
+    initScene(index);
+    updateUI();
+    updatePresenterWindow(index);
+    if (stageFade) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        stageFade.style.transition = 'opacity 0.45s ease'; stageFade.style.opacity = '0';
+      }));
+    }
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+
+    const shouldSpeak = voiceToggle.checked && options.forceSpeak;
+    if (shouldSpeak) speakSlide(index);
+    else { prefetch(index); prefetch(index + 1); }
+  }
+
+  function updateUI() {
+    btnPrev.disabled = currentSlide === 0;
+    btnNext.disabled = currentSlide === slidesData.length - 1;
+    slideCounter.textContent = `${currentSlide + 1} / ${slidesData.length}`;
+    captionText.textContent = slidesData[currentSlide].caption;
+    if (sceneNote) sceneNote.textContent = slidesData[currentSlide].sceneNote || '';
+    updateLegend(currentSlide);
+    slideViews.forEach((v, i) => v.classList.toggle('active', i === currentSlide));
+    storyNavBadges.forEach((b, i) => b.classList.toggle('active', i === currentSlide));
+    const activeBadge = storyNavBadges[currentSlide];
+    if (activeBadge) activeBadge.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUDIO & TTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  let isPlaying = false;
+  let ttsAudio = null;
+  const preloadPool = {};
+  const NARRATION_VERSION = 'blockdesign-12-20260909-v2';
+  voiceToggle.checked = false;
+
+  function ttsUrl(idx) {
+    const voice = localStorage.getItem('presentationVoiceChoice') || '';
+    return `narration/block_design/${__voiceSlug(voice)}/${idx}.mp3?v=${NARRATION_VERSION}`;
+  }
+  function prefetch(idx) {
+    if (idx < 0 || idx >= slidesData.length || preloadPool[idx]) return;
+    const a = new Audio(ttsUrl(idx)); a.preload = 'auto'; preloadPool[idx] = a;
+  }
+  function speakSlide(idx) {
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = true; btnPlay.textContent = '⏸ Пауза';
+    const audio = preloadPool[idx] || new Audio(ttsUrl(idx));
+    delete preloadPool[idx]; audio.preload = 'auto'; ttsAudio = audio;
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration) progressBar.style.width = ((audio.currentTime / audio.duration) * 100) + '%';
+    });
+    audio.addEventListener('ended', () => {
+      isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+      if (currentSlide < slidesData.length - 1) goToSlide(currentSlide + 1, { forceSpeak: true });
+    });
+    audio.play().catch(() => { isPlaying = false; btnPlay.textContent = '▶ Играть'; });
+    prefetch(idx + 1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRESENTER WINDOW
+  // ═══════════════════════════════════════════════════════════════════════════
+  let presenterWindow = null;
+  let presenterRenderToken = 0;
+  function getPresenterDoc() { return (presenterWindow && !presenterWindow.closed) ? presenterWindow.document : null; }
+  function formatNarrationHtml(text) {
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sentences = (text.match(/[^.!?…]+[.!?…]+["»)]*\s*/g) || [text]).map(s => s.trim()).filter(Boolean);
+    const paras = [];
+    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(' '));
+    return paras.map(p => '<p>' + esc(p) + '</p>').join('') || esc(text);
+  }
+  function renderPresenter(index) {
+    const doc = getPresenterDoc();
+    if (!doc) return;
+    const d = slidesData[index];
+    const token = ++presenterRenderToken;
+    const dotsHtml = slidesData.map((s, i) =>
+      `<button class="p-dot${i === index ? ' active' : ''}" data-slide="${i}" style="--p-dot:${s.tagColor}"></button>`
+    ).join('');
+    doc.body.innerHTML = `
+      <header>
+        <div>
+          <div class="eyebrow">🖥 Пульт докладчика · Блок-дизайн</div>
+          <div class="counter">Слайд ${index + 1} из ${slidesData.length}</div>
+        </div>
+        <button id="closeBtn" class="close" title="Закрыть пульт">✕</button>
+      </header>
+      <main class="notes">
+        <div class="pane-label">Точный текст озвучки &amp; Тезисы</div>
+        <div class="pv-tag" style="color:${d.tagColor}">${d.icon} ${d.tag}</div>
+        <h2>${d.title}</h2>
+        <div id="narrContent" class="pv-text">Загрузка текста озвучки…</div>
+        <div class="pv-callout">${d.callout}</div>
+        ${PRESENTER_TIPS[index] ? `<div class="pv-tip"><span class="pv-tip-label">🎛 Что на сцене</span>${PRESENTER_TIPS[index]}</div>` : ''}
+      </main>
+      <footer>
+        <button id="pPrevBtn" class="p-nav-btn" ${index === 0 ? 'disabled' : ''}>‹</button>
+        <div class="dots-wrap">${dotsHtml}</div>
+        <button id="pNextBtn" class="p-nav-btn" ${index === slidesData.length - 1 ? 'disabled' : ''}>›</button>
+      </footer>
+    `;
+    doc.getElementById('closeBtn').onclick = () => presenterWindow.close();
+    doc.getElementById('pPrevBtn').onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+    doc.getElementById('pNextBtn').onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+    doc.querySelectorAll('[data-slide]').forEach(b => {
+      b.onclick = () => goToSlide(Number(b.dataset.slide), { forceSpeak: voiceToggle.checked });
+    });
+    fetch(`narration/block_design/${index}.json`)
+      .then(r => { if (!r.ok) throw new Error('error'); return r.json(); })
+      .then(p => {
+        if (token !== presenterRenderToken) return;
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = formatNarrationHtml(p.text);
+      })
+      .catch(() => {
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = `<p>${d.desc}</p>`;
+      });
+  }
+  function updatePresenterWindow(index) { if (getPresenterDoc()) renderPresenter(index); }
+
+  async function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); renderPresenter(currentSlide); return; }
+    if ('documentPictureInPicture' in window) {
+      try {
+        presenterWindow = await documentPictureInPicture.requestWindow({
+          width: Math.max(380, Math.min(540, Math.round(screen.availWidth * 0.26))),
+          height: Math.max(540, Math.round(screen.availHeight * 0.88)),
+          disallowReturnToOpener: true
+        });
+      } catch (e) { presenterWindow = null; }
+    }
+    if (!presenterWindow) presenterWindow = window.open('', 'block-design-presenter', 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
+    if (!presenterWindow) { alert('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для пульта.'); return; }
+    presenterWindow.document.write(`<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Пульт докладчика — Блок-дизайн</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: #061019; color: #bfd6e0; font-family: 'Inter', -apple-system, sans-serif; }
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #0a1a24; border-bottom: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .eyebrow { color: #22d3ee; font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .counter { margin-top: 4px; color: #7f97a6; font-size: 11px; font-weight: 700; }
+    .close { width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    .close:hover { background: rgba(34,211,238,.25); color: #fff; }
+    .notes { flex: 1; padding: 24px 22px 90px; overflow-y: auto; }
+    .pane-label { margin-bottom: 16px; color: #5f7686; font-size: 10px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    .pv-tag { font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    h2 { margin: 10px 0 18px; color: #eef7fb; font-size: 24px; line-height: 1.2; font-weight: 800; }
+    .pv-text { font-size: 16px; line-height: 1.65; color: #d4e6ef; }
+    .pv-text p { margin-bottom: 14px; }
+    .pv-text p:first-child { font-weight: 600; color: #f0f9ff; }
+    .pv-callout { margin-top: 18px; padding: 14px 16px; border-radius: 10px; background: rgba(168,85,247,.1); border-left: 4px solid #a855f7; color: #e2ccfb; font-size: 14px; line-height: 1.5; }
+    .pv-callout .f { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: #fff; }
+    .pv-tip { margin-top: 14px; padding: 13px 15px; border-radius: 10px; background: rgba(16,185,129,.08); border: 1px dashed rgba(16,185,129,.4); color: #bdeed7; font-size: 13.5px; line-height: 1.55; }
+    .pv-tip b { color: #eafff5; font-weight: 700; }
+    .pv-tip-label { display: block; margin-bottom: 6px; color: #10b981; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #0a1a24; border-top: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .p-nav-btn { width: 36px; height: 36px; font-size: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .p-nav-btn:hover:not(:disabled) { border-color: #22d3ee; color: #fff; background: rgba(34,211,238,.2); }
+    .p-nav-btn:disabled { opacity: .25; cursor: default; }
+    .dots-wrap { flex: 1; display: flex; justify-content: center; gap: 6px; }
+    .p-dot { width: 8px; height: 8px; border-radius: 50%; border: 0; background: #2b3f4d; cursor: pointer; transition: all 0.2s; }
+    .p-dot.active { width: 22px; border-radius: 4px; background: var(--p-dot); box-shadow: 0 0 10px var(--p-dot); }
+  </style>
+</head>
+<body></body>
+</html>`);
+    presenterWindow.document.close();
+    presenterWindow.addEventListener('pagehide', () => { btnPresenter.textContent = '🖥 Пульт'; });
+    btnPresenter.textContent = '🖥 Пульт открыт';
+    renderPresenter(currentSlide);
+    presenterWindow.focus();
+  }
+
+  // ── Event Listeners ──
+  btnPrev.onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+  btnNext.onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+  btnRestart.onclick = () => goToSlide(0, { forceSpeak: voiceToggle.checked });
+  btnPresenter.onclick = openPresenter;
+  btnPlay.onclick = () => {
+    if (isPlaying && ttsAudio) { ttsAudio.pause(); isPlaying = false; btnPlay.textContent = '▶ Играть'; }
+    else if (!isPlaying && ttsAudio) { ttsAudio.play(); isPlaying = true; btnPlay.textContent = '⏸ Пауза'; }
+    else speakSlide(currentSlide);
+  };
+  voiceToggle.addEventListener('change', () => {
+    if (!voiceToggle.checked && ttsAudio) {
+      ttsAudio.pause(); ttsAudio = null; isPlaying = false;
+      btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); btnNext.click(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); btnPrev.click(); }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); openPresenter(); }
+  });
+
+  // ── Boot ──
+  resizeCanvas();
+  buildUI();
+  const hashSlide = parseInt((location.hash || '').replace('#', ''), 10);
+  const startIndex = Number.isInteger(hashSlide) && hashSlide >= 1 && hashSlide <= slidesData.length ? hashSlide - 1 : 0;
+  currentSlide = startIndex;
+  initScene(startIndex);
+  updateUI();
+  prefetch(startIndex);
+  prefetch(startIndex + 1);
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

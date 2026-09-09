@@ -1,0 +1,2984 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chemical Abstract Machine × Хлоропласты · V2 Cinematic</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #06040a; }
+
+    #cham-app {
+      --bg: #06040b;
+      --panel: #0d091a;
+      --panel-glass: rgba(13, 9, 26, 0.75);
+      --border: rgba(168, 85, 247, 0.22);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --text: #f0ecf9;
+      --muted: #9f94b8;
+      --violet: #a855f7;
+      --violet-glow: rgba(168, 85, 247, 0.45);
+      --magenta: #ec4899;
+      --cyan: #22d3ee;
+      --cyan-glow: rgba(34, 211, 238, 0.4);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.4);
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Top Story Navigator ── */
+    .top-nav {
+      flex-shrink: 0;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, #0e081c 0%, #06040b 100%);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(168, 85, 247, 0.3) transparent;
+      z-index: 10;
+    }
+    .top-nav::-webkit-scrollbar { height: 3px; }
+    .top-nav::-webkit-scrollbar-thumb { background: var(--violet); border-radius: 3px; }
+
+    .nav-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-badge:hover {
+      color: #fff;
+      border-color: var(--violet);
+      background: rgba(168, 85, 247, 0.12);
+      transform: translateY(-1px);
+    }
+    .nav-badge.active {
+      color: #0b0416;
+      background: linear-gradient(135deg, #c084fc, #a855f7);
+      border-color: #c084fc;
+      box-shadow: 0 0 16px var(--violet-glow);
+    }
+    .nav-badge .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.25);
+      color: inherit;
+      font-size: 0.62rem;
+      font-weight: 800;
+    }
+    .nav-sep { color: rgba(168, 85, 247, 0.35); font-size: 0.75rem; flex-shrink: 0; }
+
+    /* ── Main Layout ── */
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* ── Left Narrative Deck ── */
+    .deck-panel {
+      width: 480px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg, #0e091b 0%, #06040b 100%);
+      z-index: 5;
+      box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.02em;
+    }
+    .brand-title span { color: var(--violet); }
+    .brand-subtitle { font-size: 0.7rem; color: var(--muted); font-weight: 500; margin-top: 2px; }
+
+    .btn-presenter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(168, 85, 247, 0.08);
+      color: var(--violet);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-presenter:hover {
+      background: rgba(168, 85, 247, 0.22);
+      border-color: #c084fc;
+      color: #fff;
+    }
+
+    .deck-scroll {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 28px 32px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .deck-scroll::-webkit-scrollbar { width: 4px; }
+    .deck-scroll::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.25); border-radius: 2px; }
+
+    .slide-view { display: none; animation: slideFade 0.35s ease-out; }
+    .slide-view.active { display: block; }
+    @keyframes slideFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .slide-tag-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .slide-tag-line::before {
+      content: '';
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .slide-title {
+      font-size: 1.85rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.18;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+
+    .slide-desc {
+      font-size: 1.02rem;
+      line-height: 1.68;
+      color: #cfc5e6;
+      margin-bottom: 18px;
+    }
+    .slide-desc strong { color: #fff; font-weight: 700; }
+    .slide-desc .hl-cyan { color: var(--cyan); font-weight: 700; }
+    .slide-desc .hl-violet { color: #c084fc; font-weight: 700; }
+    .slide-desc .hl-emerald { color: var(--emerald); font-weight: 700; }
+
+    .callout-box {
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(168, 85, 247, 0.08);
+      border: 1px solid rgba(168, 85, 247, 0.28);
+      border-left: 4px solid var(--violet);
+      color: #d6c9ee;
+      font-size: 0.92rem;
+      line-height: 1.58;
+      margin-top: 14px;
+    }
+    .callout-box.emerald {
+      background: rgba(16, 185, 129, 0.07);
+      border-color: rgba(16, 185, 129, 0.28);
+      border-left-color: var(--emerald);
+      color: #a7e5ce;
+    }
+    .callout-box.cyan {
+      background: rgba(34, 211, 238, 0.07);
+      border-color: rgba(34, 211, 238, 0.28);
+      border-left-color: var(--cyan);
+      color: #b2eaf5;
+    }
+    .callout-box.amber {
+      background: rgba(245, 158, 11, 0.07);
+      border-color: rgba(245, 158, 11, 0.28);
+      border-left-color: var(--amber);
+      color: #ecd29b;
+    }
+    .callout-box.blue {
+      background: rgba(59, 130, 246, 0.07);
+      border-color: rgba(59, 130, 246, 0.28);
+      border-left-color: var(--blue);
+      color: #b9d6fc;
+    }
+    .callout-box b, .callout-box strong { color: #fff; }
+
+    .code-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(34, 211, 238, 0.12);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      color: #c4f3fa;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      font-weight: 700;
+    }
+
+    /* ── Bottom Deck Controls ── */
+    .deck-controls {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      gap: 8px;
+      flex-shrink: 0;
+      background: #090613;
+    }
+    .ctl-btn {
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .ctl-btn.icon-only { width: 34px; padding: 0; font-size: 15px; }
+    .ctl-btn.primary {
+      background: var(--violet);
+      color: #0d0417;
+      border: none;
+      box-shadow: 0 0 14px var(--violet-glow);
+    }
+    .ctl-btn.primary:hover:not(:disabled) { background: #c084fc; color: #000; }
+    .ctl-btn.ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-light);
+      color: var(--muted);
+    }
+    .ctl-btn.ghost:hover:not(:disabled) {
+      border-color: var(--violet);
+      color: #fff;
+      background: rgba(168, 85, 247, 0.1);
+    }
+    .ctl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .deck-progress {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 0 4px;
+    }
+    .deck-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--violet), var(--cyan));
+      transition: width 0.2s linear;
+    }
+
+    .slide-counter-badge {
+      font-size: 0.74rem;
+      font-weight: 800;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .voice-toggle-label {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .voice-toggle-label input { position: absolute; opacity: 0; pointer-events: none; }
+    .voice-toggle-label:hover { border-color: var(--violet); }
+    .voice-toggle-label input:checked + .v-icon { color: var(--violet); filter: drop-shadow(0 0 6px var(--violet)); }
+    .v-icon { font-size: 15px; }
+
+    /* ── Right Stage: Interactive Physics & Graphics ── */
+    .stage-panel {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle at 60% 50%, #160c2d 0%, #06040c 80%);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #stage-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Floating Canvas HUD Overlays */
+    .stage-hud-top {
+      position: absolute;
+      top: 18px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(10, 7, 20, 0.85);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      backdrop-filter: blur(10px);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #e5def5;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .hud-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: hudPulse 1.8s infinite;
+    }
+    @keyframes hudPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+
+    .hud-controls-group {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-action-btn {
+      padding: 7px 14px;
+      border-radius: 14px;
+      background: rgba(168, 85, 247, 0.18);
+      border: 1px solid rgba(168, 85, 247, 0.45);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
+    .hud-action-btn:hover {
+      background: var(--violet);
+      color: #0b0416;
+      box-shadow: 0 0 16px var(--violet-glow);
+      transform: translateY(-1px);
+    }
+
+    .stage-hud-bottom {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      width: max-content;
+      max-width: min(560px, 88%);
+    }
+    /* Plain-language "что ты сейчас видишь" — helps the room read the scene at a glance */
+    .stage-scene-note {
+      pointer-events: none;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #b9addb;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      max-width: 100%;
+    }
+    .stage-caption-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 22px;
+      border-radius: 30px;
+      background: rgba(8, 5, 18, 0.92);
+      border: 1px solid rgba(168, 85, 247, 0.45);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      color: #f1edfa;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .stage-caption-pill .cap-icon { color: var(--cyan); font-size: 1rem; }
+
+    /* Interactive Overlay Widgets per Slide */
+    .interactive-dock {
+      position: absolute;
+      bottom: 106px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+    .dock-btn {
+      padding: 7px 14px;
+      border-radius: 10px;
+      background: rgba(14, 9, 28, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #ded6f0;
+      font-size: 0.74rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s;
+    }
+    .dock-btn:hover {
+      border-color: var(--cyan);
+      color: #fff;
+      background: rgba(34, 211, 238, 0.16);
+      transform: translateY(-2px);
+    }
+    .dock-btn.active {
+      background: var(--cyan);
+      color: #061820;
+      border-color: var(--cyan);
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+
+    /* Color legend: maps every scene color to its meaning so the room reads it instantly */
+    .stage-legend {
+      position: absolute;
+      bottom: 20px;
+      left: 24px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(8, 5, 18, 0.82);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      pointer-events: none;
+      max-width: 240px;
+    }
+    .stage-legend .legend-title {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .stage-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #e5def5;
+      line-height: 1.2;
+    }
+    .stage-legend .legend-dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    /* Cinematic dissolve overlay: covers the hard scene swap between slides */
+    .stage-fade {
+      position: absolute;
+      inset: 0;
+      z-index: 9;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle at 60% 50%, #160c2d 0%, #06040c 80%);
+    }
+  </style>
+</head>
+<body>
+
+<div id="cham-app">
+  <!-- ── Top Story Path ── -->
+  <nav class="top-nav" id="top-nav" aria-label="Путь презентации"></nav>
+
+  <!-- ── Main Workspace ── -->
+  <div class="main-workspace">
+    
+    <!-- ── Left Narrative Deck ── -->
+    <aside class="deck-panel">
+      <div class="brand-header">
+        <div>
+          <div class="brand-title">⚗️ Chemical Abstract <span>Machine</span></div>
+          <div class="brand-subtitle">G. Berry &amp; G. Boudol 1992 · Мост: Хлоропласты ⇄ Графы</div>
+        </div>
+        <button class="btn-presenter" id="btn-presenter" title="Открыть пульт докладчика">🖥 Пульт</button>
+      </div>
+
+      <div class="deck-scroll" id="deck-scroll"></div>
+
+      <div class="deck-controls">
+        <button id="btn-prev" class="ctl-btn ghost icon-only" aria-label="Назад" disabled>‹</button>
+        <button id="btn-play" class="ctl-btn primary">▶ Играть</button>
+        <button id="btn-restart" class="ctl-btn ghost icon-only" title="В начало">↺</button>
+        <div class="deck-progress"><div class="deck-progress-fill" id="progress-bar"></div></div>
+        <span class="slide-counter-badge" id="slide-counter">1 / 10</span>
+        <label class="voice-toggle-label" title="Озвучка (TTS)" aria-label="Голос">
+          <input type="checkbox" id="voice-toggle">
+          <span class="v-icon">🗣️</span>
+        </label>
+        <select id="vpick-select" title="Голос докладчика" aria-label="Голос докладчика" style="height:32px;border:1px solid #30363d;border-radius:7px;background:#0d1117;color:#c9d1d9;padding:0 8px;font:inherit;font-size:.8rem;cursor:pointer;max-width:160px;">
+          <option value="edge:ru-RU-DmitryNeural">🤖 Стандартный</option>
+          <option value="elevenlabs:mine">🎙 Мой голос</option>
+        </select>
+        <script>window.__voiceSlug=function(v){v=String(v||'');return v.indexOf('elevenlabs')===0?'mine':'edge';};</script>
+<script>(function(){var K='presentationVoiceChoice',D='elevenlabs:mine',s=document.getElementById('vpick-select');var v=localStorage.getItem(K);if(!v){v=D;localStorage.setItem(K,D);}s.value=[].some.call(s.options,function(o){return o.value===v})?v:D;s.addEventListener('change',function(){localStorage.setItem(K,s.value||D);});})();</script>
+        <button id="btn-next" class="ctl-btn ghost">Далее ›</button>
+      </div>
+    </aside>
+
+    <!-- ── Right Stage (60 FPS Physics / Graphics Canvas) ── -->
+    <main class="stage-panel">
+      <canvas id="stage-canvas"></canvas>
+
+      <!-- Cinematic scene-swap dissolve -->
+      <div class="stage-fade" id="stage-fade"></div>
+
+      <!-- Color legend (color → meaning) -->
+      <div class="stage-legend" id="stage-legend"></div>
+
+      <!-- HUD Top -->
+      <div class="stage-hud-top">
+        <div class="hud-pill">
+          <span class="hud-dot" id="hud-status-dot"></span>
+          <span id="hud-status-text">CHAM Engine Active · 60 FPS</span>
+        </div>
+        <div class="hud-controls-group" id="hud-actions"></div>
+      </div>
+
+      <!-- Interactive Widget Dock -->
+      <div class="interactive-dock" id="interactive-dock"></div>
+
+      <!-- HUD Bottom Caption -->
+      <div class="stage-hud-bottom">
+        <div class="stage-caption-pill">
+          <span class="cap-icon">✦</span>
+          <span id="stage-caption-text">Инициализация физического симулятора…</span>
+        </div>
+        <div class="stage-scene-note" id="stage-scene-note"></div>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SLIDES DATA (Texts + Scientific Bridge)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const V = '#a855f7', MAG = '#ec4899', CY = '#22d3ee', EM = '#10b981', AMB = '#f59e0b', BLUE = '#3b82f6';
+
+  const slidesData = [
+    {
+      icon: '🧭', tag: 'Мост', tagColor: V, storyLabel: 'Мост: Три мира', mode: 'morph_bridge',
+      caption: 'Один фундаментальный принцип: Клетка ⇄ CHAM ⇄ Граф simulator',
+      sceneNote: 'Жми кнопки внизу — одна и та же сетка перетекает: клетка → раствор → граф.',
+      title: 'От танца хлоропластов — к химической машине',
+      desc: `В прошлой презентации клетка находила структуру <strong>сама, без дирижёра</strong>. <strong>CHAM</strong> (Берри и Будоль, 1992) — строгая модель того же: вычисление как <span class="hl-cyan">химические реакции в растворе</span>.`,
+      callout: `<b>Тезис всей презентации:</b> структура = порядок. Порядок вычисления не навязан сверху — он и есть структура молекул и мембран.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '🌀', tag: 'Эмерджентность', tagColor: EM, storyLabel: 'Эмерджентность', mode: 'emergence_swarm',
+      caption: 'Локальные правила частиц рождают глобальный порядок без центра',
+      sceneNote: 'Точки живут по одному правилу и сами собираются в структуру. Смени правило — форма меняется.',
+      title: 'Порядок без управляющего',
+      desc: `Стая скворцов, хлоропласты в клетке, распределённые процессы — везде простые <strong>локальные правила</strong> рождают сложный глобальный порядок.`,
+      callout: `CHAM говорит это строго: вместо органелл — <strong>молекулы</strong>, вместо физики — <strong>правила локальных реакций</strong>.`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '⚗️', tag: 'Раствор', tagColor: CY, storyLabel: 'Раствор { … }', mode: 'chemical_beaker',
+      caption: 'Молекулы плавают в броуновском растворе и реагируют при столкновении',
+      sceneNote: 'Молекулы плавают и сталкиваются; «a» и «ā» реагируют при встрече. Порядка нет — всё сразу.',
+      title: 'Состояние — это «химический раствор»',
+      desc: `Состояние системы — <strong>раствор</strong> с плавающими <strong>молекулами</strong>. Они реагируют <span class="hl-cyan">при встрече</span>, по локальным правилам.`,
+      callout: `Реакции истинно <strong>параллельны</strong>: одновременно идёт сколько угодно реакций в разных точках пространства. Единого счётчика команд нет.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '{ }', tag: 'Мультимножество', tagColor: V, storyLabel: 'Решето Эратосфена', mode: 'sieve_crystals',
+      caption: 'Решето: правило «удаляй кратные» само оставляет простые кристаллы',
+      sceneNote: 'Зелёные остаются сами — это простые числа; серые вычеркнуло правило «убери кратных».',
+      title: 'Раствор — это мультимножество',
+      desc: `Раствор — это <strong>мультимножество</strong> <span class="code-badge">{ … }</span>: порядок не важен, <span class="code-badge">P | Q = Q | P</span>. Параллельность — по умолчанию.`,
+      callout: `Пример из статьи: числа начиная с 2 и одно правило — «каждое убирает своих кратных». Без дирижёра в растворе сами остаются <strong>только простые числа</strong>.`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '⚡', tag: 'Реакция', tagColor: MAG, storyLabel: 'Ионы и Реакция', mode: 'reaction_collider',
+      caption: 'a·P + ā·Q → P, Q · Квантовое рукопожатие валентностей',
+      sceneNote: 'Два иона слетаются, действия гасят друг друга — и наружу выходят «P» и «Q».',
+      title: 'Реакция = рукопожатие валентностей',
+      desc: `<strong>Ион</strong> несет <em>валентность</em> — предложение действия. <span class="code-badge">a·P</span> предлагает <em>a</em>, встречный <span class="code-badge">ā·Q</span> — противоположное <em>ā</em>.`,
+      callout: `При встрече <strong>a</strong> и <strong>ā</strong> гасят друг друга (рукопожатие), а тела <strong>P</strong> и <strong>Q</strong> выходят на свободу. Правило локальное: остальной раствор не трогается.`,
+      calloutClass: ''
+    },
+    {
+      icon: '🌡️', tag: 'Термодинамика', tagColor: AMB, storyLabel: 'Нагрев / Охлаждение', mode: 'thermo_heatcool',
+      caption: 'Нагрев ⇀ дробит на ионы · Охлаждение ↽ конденсирует в цепочки',
+      sceneNote: 'Двигай температуру: жар дробит молекулу на части, холод собирает обратно.',
+      title: 'Нагрев и охлаждение',
+      desc: `Чтобы молекула вступила в реакцию, её <strong>нагревают</strong> (дробят на свободные ионы); при <strong>охлаждении</strong> — собирают обратно.`,
+      callout: `Это обратимо (<span class="code-badge">⇌</span>) и ничего не вычисляет — лишь меняет <strong>структуру</strong>, выставляя реагентов к встрече.`,
+      calloutClass: 'amber'
+    },
+    {
+      icon: '🫧', tag: 'Инкапсуляция', tagColor: V, storyLabel: 'Мембраны & Airlock', mode: 'membrane_airlock',
+      caption: 'Мембрана {S} = изолированный подпроцесс · Airlock = шлюз наружу',
+      sceneNote: 'Пунктир — мембрана с подраствором внутри; шлюз выпускает наружу ровно одну молекулу.',
+      title: 'Мембраны и шлюзы (Airlock)',
+      desc: `Молекула может держать внутри <strong>целый подраствор</strong> — <span class="code-badge">{ S }</span>. Это инкапсуляция и иерархия подсистем.`,
+      callout: `Наружу выпускает шлюз <strong>airlock</strong> <span class="code-badge">m ◁ S</span> — берёт одну молекулу, остальное оставляет внутри. Всё держат три закона: <b>Reaction</b>, <b>Chemical</b>, <b>Membrane</b>.`,
+      calloutClass: ''
+    },
+    {
+      icon: '🎯', tag: 'Закон', tagColor: CY, storyLabel: 'Структура = Порядок', mode: 'order_vs_parallel',
+      caption: 'Одни элементы: параллельный хаос vs строгая структурная цепь',
+      sceneNote: 'Слева — куча без порядка, справа — цепь a→b→c. Элементы те же, порядок задаёт структура.',
+      title: 'Структура = порядок',
+      desc: `Слева <strong>мультимножество</strong> — порядка нет, всё сразу. Справа <strong>цепь</strong> <span class="code-badge">a · b · c</span> — порядок задан структурой.`,
+      callout: `Порядок не навязан планировщиком сверху — он и есть геометрия связей. Ровно как в клетке хлоропластов: <strong>геометрия формы определяет поведение</strong>.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '⬡', tag: 'Практика', tagColor: BLUE, storyLabel: 'Графы Simulator', mode: 'actor_graph_sim',
+      caption: 'Акторы = молекулы · Событие = реакция · Backpressure = Heating/Cooling',
+      sceneNote: 'По рёбрам бегут события между акторами. Жми «всплеск» — граф перестраивает потоки.',
+      title: 'От раствора — к графам simulator',
+      desc: `Наш граф — тот же раствор: <strong>акторы</strong> вместо молекул, <strong>событие</strong> вместо реакции. Топология = порядок; глобального планировщика нет.`,
+      callout: `Мембрана = подпроцесс. Нагрев/охлаждение = <strong>backpressure</strong> и перестройка топологии под нагрузкой.`,
+      calloutClass: 'blue'
+    },
+    {
+      icon: '⚛️', tag: 'Идея для Simulator', tagColor: EM, storyLabel: 'Reaction-нода', mode: 'reaction_join',
+      caption: 'Reaction-нода: срабатывает по встрече, а не по маршруту',
+      sceneNote: 'Задачи копятся у реактора. Как только собраны все — реакция: их консюмит разом и рождает результат.',
+      title: 'Что берём в Simulator: реакция по встрече',
+      desc: `Сегодня задача идёт <strong>по маршруту</strong> — нода за нодой. CHAM подсказывает другое: <strong>reaction-нода</strong> ждёт, пока не встретятся <span class="hl-cyan">все нужные задачи</span> сразу — и только тогда срабатывает.`,
+      callout: `<b>Чего у нас нет:</b> узел объявляет набор <span class="code-badge">Заказ · Оплата · Резерв → Отгрузка</span> и срабатывает <strong>атомарно</strong>, когда все присутствуют — консюмит их разом и рождает продукт. Без очередей и ручной сборки по correlation id.`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '🎯', tag: 'Идея для Simulator', tagColor: CY, storyLabel: 'Конфлюэнтность + Replay', mode: 'confluence_replay',
+      caption: 'Порядок не важен? Проверь заранее. Инцидент? Переиграй.',
+      sceneNote: 'Одни события в разном порядке. Сошлись в одно — безопасно. Разошлись — гонка.',
+      title: 'Порядок событий: безопасно или гонка?',
+      desc: `Два события пришли почти одновременно. <strong>Конфлюэнтность</strong> заранее говорит: зависит ли итог от их порядка. Сошлось — <span class="hl-emerald">безопасно</span>. Разошлось — <span class="hl-cyan">гонка</span>.`,
+      callout: `<b>Replay:</b> все события записаны — их можно <strong>прокрутить заново</strong> и получить тот же итог. Клиент жалуется «странно отработало» — переигрываем его инстанс и видим ровно, что произошло.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '↩️', tag: 'Идея для Simulator', tagColor: AMB, storyLabel: 'SAGA-откат', mode: 'saga_rollback',
+      caption: 'Полшага сделано и упало — движок сам разматывает назад',
+      sceneNote: 'Цепочка идёт вперёд; шаг упал — включается откат, шаги отменяются в обратном порядке.',
+      title: 'Обратимость: откат наполовину прошедшей цепочки',
+      desc: `Цепочка шагов идёт вперёд. Если шаг <strong>упал</strong> — наполовину сделанную работу нужно <span class="hl-amber">размотать назад</span> до целостного состояния.`,
+      callout: `<b>Чего у нас нет:</b> откат как <strong>встроенное свойство</strong> (в CHAM структура обратима, <span class="code-badge">⇌</span>). Сейчас компенсации рисуют отдельными ветками руками — здесь движок сам проигрывает цепочку назад.`,
+      calloutClass: 'amber'
+    }
+  ];
+
+  // Пульт-only подсказки докладчику: что за интерактив на сцене и какой смысл им показать.
+  // (Не входят в озвучку — TTS не трогаем; видны только в пульте.)
+  const PRESENTER_TIPS = [
+    'Справа — переключатель трёх миров: <b>🌿 Клетка → ⚗️ Раствор CHAM → ⬡ Граф Simulator</b>. Покажи, как одна и та же структура «перетекает» из биологии в формальную модель и в наш граф.',
+    'Переключай локальное правило частиц: <b>☀️ Сбор</b> · <b>🛡️ Защита</b> · <b>🌀 Хаос</b>. Меняешь одно правило — вся «стая» перестраивается сама, без центра; «Хаос» = правила нет → структура распадается. Это и есть эмерджентность.',
+    'Кнопка <b>«✚ Добавить молекулу»</b> бросает в раствор новый ион — покажи, что реакции идут параллельно в разных точках, без общего счётчика команд.',
+    'Кнопка <b>«⚡ Запустить шаг решета»</b> прогоняет один шаг: очередное простое вычёркивает своих кратных. Жми по шагам — простые числа «кристаллизуются» сами, без дирижёра.',
+    'Кнопка <b>«💥 Запустить реакцию снова»</b> повторяет столкновение <b>a·P + ā·Q → P, Q</b>. Запусти пару раз, обращая внимание на «рукопожатие» валентностей.',
+    'Кнопки температуры: <b>❄️ Заморозить</b> · <b>⛅ Баланс</b> · <b>🔥 Нагреть</b>. Нагрев дробит молекулы на ионы, охлаждение собирает обратно — покажи обратимость (⇌).',
+    'Кнопка <b>«🚪 Запустить цикл шлюза»</b> проигрывает вынос одной молекулы наружу через airlock <b>m ◁ S</b> — контролируемый порт мембраны, остальное остаётся внутри.',
+    'Кнопок нет — сцена сама сравнивает: слева параллельный «мешок» <b>{ a, b, c }</b> без порядка, справа жёсткая цепь <b>a·b·c</b>. Одни элементы — разный порядок из разной структуры.',
+    'Кнопка <b>«⚡ Инжектировать всплеск нагрузки»</b> вбрасывает пик событий в граф акторов — топология перестраивает потоки (backpressure), как heating/cooling в CHAM.',
+    'Кнопки внизу бросают задачи в реактор: <b>Заказ · Оплата · Резерв</b>. Пока собран не весь набор — узел ждёт (это и есть backpressure). Как только все три на месте — <b>реакция</b>: задачи консюмятся разом и рождается <b>Отгрузка</b>. Мысль для зала: такого узла-реакции у нас сейчас нет — сборку делаем очередями и correlation id вручную.',
+    'Переключай внизу <b>✓ Порядок не важен ⇄ ⚡ Гонка</b>. Одни и те же два события в разном порядке: слева сходятся в один итог (зелёное — безопасно), справа дают разные числа (красное — гонка). Сверху — лента <b>Replay</b>: главный сценарий для <b>саппорта</b> — переиграть события инстанса клиента и увидеть ровно, что произошло.',
+    'Жми <b>▶ Прогнать заново</b>. Цепочка идёт вперёд: списать A → зачислить B → чек. Шаг <b>B падает</b> (красный ✗) — и включается <b>откат ⇌</b>: движок сам отменяет уже сделанное в обратном порядке (возвращает списание A), пока состояние снова не станет целостным. Мысль: сейчас такие компенсации рисуют ветками руками.'
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 60 FPS 2D PHYSICS & VISUAL ENGINE
+  // ═══════════════════════════════════════════════════════════════════════════
+  const canvas = document.getElementById('stage-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Projector readability: enlarge EVERY on-canvas label uniformly, so mono
+  // labels (a·P, числа решета, m ◁ S…) read from the back of the room.
+  const FONT_SCALE = 1.4;
+  const _fontDesc = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'font');
+  Object.defineProperty(ctx, 'font', {
+    configurable: true,
+    get() { return _fontDesc.get.call(this); },
+    set(v) {
+      _fontDesc.set.call(this, String(v).replace(/(\d+(?:\.\d+)?)px/, (m, n) => (parseFloat(n) * FONT_SCALE).toFixed(1) + 'px'));
+    }
+  });
+
+  let width = 0, height = 0, dpr = 1;
+
+  function resizeCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    width = rect.width;
+    height = rect.height;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.resetTransform && ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  let currentSlide = 0;
+  let animTime = 0;
+  let particles = [];
+  let shockwaves = [];
+  let sparks = [];
+  let customState = {};
+
+  const PALETTE = {
+    bg: '#06040b',
+    violet: '#a855f7',
+    magenta: '#ec4899',
+    cyan: '#22d3ee',
+    emerald: '#10b981',
+    amber: '#f59e0b',
+    blue: '#3b82f6',
+    white: '#ffffff',
+    muted: '#9f94b8'
+  };
+
+  // Reaction-join scene (slide 10): input kinds that must all meet before the node fires.
+  const JOIN_KINDS = {
+    order: { color: '#22d3ee', label: 'Заказ',  short: 'a' },
+    pay:   { color: '#ec4899', label: 'Оплата', short: 'b' },
+    stock: { color: '#f59e0b', label: 'Резерв', short: 'c' }
+  };
+
+  function joinGeom() {
+    const cx = width * 0.54, cy = height * 0.5;
+    const r = Math.min(width * 0.15, height * 0.2, 148);
+    const rad = a => a * Math.PI / 180;
+    return {
+      cx, cy, r,
+      slots: {
+        order: { x: cx + r * Math.cos(rad(215)), y: cy + r * Math.sin(rad(215)) },
+        pay:   { x: cx + r * Math.cos(rad(180)), y: cy + r * Math.sin(rad(180)) },
+        stock: { x: cx + r * Math.cos(rad(145)), y: cy + r * Math.sin(rad(145)) }
+      },
+      sources: {
+        order: { x: width * 0.08, y: cy - height * 0.28 },
+        pay:   { x: width * 0.08, y: cy },
+        stock: { x: width * 0.08, y: cy + height * 0.28 }
+      },
+      exit: { x: width * 0.88, y: cy }
+    };
+  }
+
+  function injectJoin(kind) {
+    if (!customState.tokens) return;
+    const g = joinGeom();
+    const s = g.sources[kind];
+    customState.tokens.push({
+      kind, x: s.x, y: s.y + (Math.random() - 0.5) * 24,
+      arrived: false, assigned: false
+    });
+  }
+
+  function addSparks(x, y, color, count = 16, maxSpeed = 5) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * maxSpeed;
+      sparks.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1.0,
+        decay: 0.02 + Math.random() * 0.03,
+        color: color,
+        size: 2 + Math.random() * 3
+      });
+    }
+  }
+
+  function addShockwave(x, y, color, maxRadius = 80) {
+    shockwaves.push({
+      x, y,
+      radius: 5,
+      maxRadius: maxRadius,
+      life: 1.0,
+      decay: 0.03,
+      color: color
+    });
+  }
+
+  function initScene(slideIndex) {
+    particles = [];
+    shockwaves = [];
+    sparks = [];
+    customState = {};
+    const mode = slidesData[slideIndex].mode;
+
+    if (mode === 'morph_bridge' || mode === 'tri_world_synthesis') {
+      customState.viewMode = customState.viewMode || 'cell';
+      const cols = 6, rows = 6;
+      const spacingX = Math.min(width * 0.55, 380) / cols;
+      const spacingY = Math.min(height * 0.55, 360) / rows;
+      const startX = width / 2 - (cols * spacingX) / 2 + spacingX / 2;
+      const startY = height / 2 - (rows * spacingY) / 2 + spacingY / 2;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          particles.push({
+            id: r * cols + c,
+            cellX: startX + c * spacingX + (r % 2 === 1 ? spacingX * 0.4 : 0),
+            cellY: startY + r * spacingY,
+            chamX: width * 0.25 + Math.random() * (width * 0.5),
+            chamY: height * 0.25 + Math.random() * (height * 0.5),
+            chamVx: (Math.random() - 0.5) * 1.5,
+            chamVy: (Math.random() - 0.5) * 1.5,
+            graphX: width * 0.2 + (c / (cols - 1)) * (width * 0.6),
+            graphY: height * 0.22 + (r / (rows - 1)) * (height * 0.56) + Math.sin(c) * 20,
+            x: startX + c * spacingX,
+            y: startY + r * spacingY,
+            vx: 0, vy: 0,
+            radius: 14,
+            type: (r + c) % 3 === 0 ? 'a' : ((r + c) % 3 === 1 ? 'abar' : 'inert'),
+            label: (r + c) % 3 === 0 ? 'a·P' : ((r + c) % 3 === 1 ? 'ā·Q' : 'R')
+          });
+        }
+      }
+    }
+    else if (mode === 'emergence_swarm') {
+      customState.rule = 'hex_pack';
+      const count = 48;
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: width / 2 + (Math.random() - 0.5) * 300,
+          y: height / 2 + (Math.random() - 0.5) * 300,
+          vx: (Math.random() - 0.5) * 2,
+          vy: (Math.random() - 0.5) * 2,
+          targetX: 0, targetY: 0,
+          radius: 12,
+          color: PALETTE.emerald
+        });
+      }
+    }
+    else if (mode === 'chemical_beaker') {
+      const count = 22;
+      for (let i = 0; i < count; i++) {
+        const type = i % 3 === 0 ? 'a' : (i % 3 === 1 ? 'abar' : 'inert');
+        particles.push({
+          x: width * 0.25 + Math.random() * (width * 0.5),
+          y: height * 0.25 + Math.random() * (height * 0.5),
+          vx: (Math.random() - 0.5) * 2.2,
+          vy: (Math.random() - 0.5) * 2.2,
+          radius: 20,
+          type: type,
+          val: type === 'a' ? 'a' : (type === 'abar' ? 'ā' : ''),
+          body: type === 'a' ? 'P' : (type === 'abar' ? 'Q' : 'S' + (i % 5))
+        });
+      }
+    }
+    else if (mode === 'sieve_crystals') {
+      customState.sieveStep = 0;
+      customState.primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31];
+      customState.activePrime = null;
+      customState.timer = 0;
+      const count = 30;
+      const cols = 6;
+      const startX = width / 2 - (cols * 56) / 2 + 28;
+      const startY = height / 2 - 130;
+
+      for (let n = 2; n <= 31; n++) {
+        const idx = n - 2;
+        const c = idx % cols;
+        const r = Math.floor(idx / cols);
+        particles.push({
+          num: n,
+          x: startX + c * 56,
+          y: startY + r * 56,
+          targetX: startX + c * 56,
+          targetY: startY + r * 56,
+          radius: 20,
+          state: 'idle',
+          glow: 0
+        });
+      }
+    }
+    else if (mode === 'reaction_collider') {
+      customState.phase = 'approach';
+      customState.reactionTimer = 0;
+      customState.totalReactions = 0;
+      spawnColliderPair();
+    }
+    else if (mode === 'thermo_heatcool') {
+      customState.temp = 0.2;
+      customState.targetTemp = 0.2;
+      for (let i = 0; i < 6; i++) {
+        particles.push({
+          baseX: width * 0.35 + (i % 2) * 160,
+          baseY: height * 0.32 + Math.floor(i / 2) * 110,
+          x: width * 0.35 + (i % 2) * 160,
+          y: height * 0.32 + Math.floor(i / 2) * 110,
+          vx: 0, vy: 0,
+          radius: 22,
+          bonded: true
+        });
+      }
+    }
+    else if (mode === 'membrane_airlock') {
+      // Physical Airlock System Initialization
+      customState.airlockStage = 'idle'; // 'idle', 'approach_inner', 'inner_open', 'docked_isolated', 'outer_open', 'ejected'
+      customState.airlockTimer = 0;
+      customState.innerDoorOpen = 0.0; // 0 (closed) to 1 (fully open)
+      customState.outerDoorOpen = 0.0;
+      customState.transitMol = null;
+      customState.statusMessage = 'Шлюз в режиме ожидания · { S } изолирован';
+
+      // 8 Outer molecules floating in main solution
+      for (let i = 0; i < 8; i++) {
+        particles.push({
+          id: 'out_' + i,
+          x: width * 0.68 + Math.random() * (width * 0.22),
+          y: height * 0.25 + Math.random() * (height * 0.5),
+          vx: (Math.random() - 0.5) * 1.5,
+          vy: (Math.random() - 0.5) * 1.5,
+          radius: 17,
+          type: 'a',
+          label: 'a·P',
+          location: 'outer'
+        });
+      }
+
+      // 6 Subsystem molecules floating inside { S }
+      for (let i = 0; i < 6; i++) {
+        particles.push({
+          id: 'sub_' + i,
+          x: width * 0.32 + (Math.random() - 0.5) * 100,
+          y: height * 0.5 + (Math.random() - 0.5) * 100,
+          vx: (Math.random() - 0.5) * 1.2,
+          vy: (Math.random() - 0.5) * 1.2,
+          radius: 17,
+          type: 'abar',
+          label: i === 0 ? 'm' : 'ā·Q',
+          location: 'subsolution'
+        });
+      }
+    }
+    else if (mode === 'order_vs_parallel') {
+      for (let i = 0; i < 3; i++) {
+        particles.push({
+          side: 'left',
+          x: width * 0.25 + (Math.random() - 0.5) * 80,
+          y: height * 0.45 + (i - 1) * 60,
+          vx: (Math.random() - 0.5) * 1.5,
+          vy: (Math.random() - 0.5) * 1.5,
+          radius: 20,
+          label: ['a', 'b', 'c'][i],
+          color: [PALETTE.cyan, PALETTE.magenta, PALETTE.emerald][i]
+        });
+      }
+      for (let i = 0; i < 3; i++) {
+        particles.push({
+          side: 'right',
+          x: width * 0.72,
+          y: height * 0.32 + i * 85,
+          vx: 0, vy: 0,
+          radius: 20,
+          label: ['a', 'b', 'c'][i],
+          color: [PALETTE.cyan, PALETTE.magenta, PALETTE.emerald][i],
+          active: i === 0
+        });
+      }
+    }
+    else if (mode === 'actor_graph_sim') {
+      customState.packets = [];
+      customState.load = 0.3;
+      customState.rebalanced = false;
+      customState.nodes = [
+        { id: 1, name: 'A1 (Hub)', x: width * 0.32, y: height * 0.5, r: 32, color: PALETTE.violet, heat: 0 },
+        { id: 2, name: 'A2 (Worker)', x: width * 0.62, y: height * 0.32, r: 24, color: PALETTE.blue, heat: 0 },
+        { id: 3, name: 'A3 (Worker)', x: width * 0.62, y: height * 0.68, r: 24, color: PALETTE.blue, heat: 0 },
+        { id: 4, name: 'A4 (Drain)', x: width * 0.82, y: height * 0.5, r: 22, color: PALETTE.emerald, heat: 0 }
+      ];
+    }
+    else if (mode === 'reaction_join') {
+      customState.slots = { order: null, pay: null, stock: null };
+      customState.tokens = [];
+      customState.products = [];
+      customState.count = 0;
+      customState.flash = 0;
+      customState.spawnTimer = 1.0;
+    }
+    else if (mode === 'confluence_replay') {
+      customState.example = 'commutative'; // 'commutative' (safe) | 'race'
+      customState.replayHead = 0;
+    }
+    else if (mode === 'saga_rollback') {
+      customState.phase = 'forward'; // forward | failed | rollback | restored
+      customState.step = 0;
+      customState.failAt = 1;
+      customState.timer = 0;
+      customState.done = [false, false, false];
+    }
+
+    renderHUDControls(slideIndex);
+  }
+
+  function spawnColliderPair() {
+    customState.molA = {
+      x: width * 0.2, y: height * 0.5,
+      targetX: width * 0.5 - 28, targetY: height * 0.5,
+      vx: 3.5, vy: 0,
+      val: 'a', body: 'P', color: PALETTE.cyan, radius: 24
+    };
+    customState.molB = {
+      x: width * 0.8, y: height * 0.5,
+      targetX: width * 0.5 + 28, targetY: height * 0.5,
+      vx: -3.5, vy: 0,
+      val: 'ā', body: 'Q', color: PALETTE.magenta, radius: 24
+    };
+    customState.phase = 'approach';
+    customState.reactionTimer = 0;
+  }
+
+  // ── Launch Full Airlock Transit Cycle ──────────────────────────────────────
+  function startAirlockExtraction() {
+    if (customState.airlockStage !== 'idle' && customState.airlockStage !== 'ejected') return;
+
+    // Pick a candidate inside { S }
+    const candidate = particles.find(p => p.location === 'subsolution');
+    if (!candidate) return;
+
+    candidate.location = 'in_transit';
+    candidate.label = 'm';
+    customState.transitMol = candidate;
+    customState.airlockStage = 'approach_inner';
+    customState.airlockTimer = 0;
+    customState.statusMessage = '1. Захват молекулы m из { S } к шлюзу...';
+  }
+
+  function renderHUDControls(slideIndex) {
+    const hudGroup = document.getElementById('hud-actions');
+    const dockGroup = document.getElementById('interactive-dock');
+    hudGroup.innerHTML = '';
+    dockGroup.innerHTML = '';
+    const mode = slidesData[slideIndex].mode;
+
+    if (mode === 'morph_bridge' || mode === 'tri_world_synthesis') {
+      ['cell', 'cham', 'graph'].forEach(m => {
+        const b = document.createElement('button');
+        b.className = 'dock-btn' + (customState.viewMode === m ? ' active' : '');
+        b.textContent = m === 'cell' ? '🌿 1. Клетка' : (m === 'cham' ? '⚗️ 2. Раствор CHAM' : '⬡ 3. Граф Simulator');
+        b.onclick = () => {
+          customState.viewMode = m;
+          document.querySelectorAll('.dock-btn').forEach(btn => btn.classList.remove('active'));
+          b.classList.add('active');
+        };
+        dockGroup.appendChild(b);
+      });
+    }
+    else if (mode === 'emergence_swarm') {
+      [
+        { key: 'hex_pack', label: '☀️ Сбор (Accumulation)' },
+        { key: 'wall_avoidance', label: '🛡️ Защита (Avoidance)' },
+        { key: 'random', label: '🌀 Хаос' }
+      ].forEach(item => {
+        const b = document.createElement('button');
+        b.className = 'dock-btn' + (customState.rule === item.key ? ' active' : '');
+        b.textContent = item.label;
+        b.onclick = () => {
+          customState.rule = item.key;
+          document.querySelectorAll('.dock-btn').forEach(btn => btn.classList.remove('active'));
+          b.classList.add('active');
+        };
+        dockGroup.appendChild(b);
+      });
+    }
+    else if (mode === 'chemical_beaker') {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn';
+      b.innerHTML = '✚ Добавить молекулу';
+      b.onclick = () => {
+        const type = Math.random() > 0.5 ? 'a' : 'abar';
+        particles.push({
+          x: width * 0.5, y: height * 0.3,
+          vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4,
+          radius: 20, type: type,
+          val: type === 'a' ? 'a' : 'ā',
+          body: type === 'a' ? 'P' + particles.length : 'Q' + particles.length
+        });
+        addSparks(width * 0.5, height * 0.3, type === 'a' ? PALETTE.cyan : PALETTE.magenta, 20);
+      };
+      hudGroup.appendChild(b);
+    }
+    else if (mode === 'sieve_crystals') {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn';
+      b.innerHTML = '⚡ Запустить шаг решета';
+      b.onclick = triggerNextSieveStep;
+      hudGroup.appendChild(b);
+    }
+    else if (mode === 'reaction_collider') {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn';
+      b.innerHTML = '💥 Запустить реакцию снова';
+      b.onclick = spawnColliderPair;
+      hudGroup.appendChild(b);
+    }
+    else if (mode === 'thermo_heatcool') {
+      [
+        { val: 0.1, label: '❄️ Заморозить (Cooling)' },
+        { val: 0.5, label: '⛅ Баланс' },
+        { val: 0.95, label: '🔥 Нагреть (Heating)' }
+      ].forEach(t => {
+        const b = document.createElement('button');
+        b.className = 'dock-btn' + (Math.abs(customState.targetTemp - t.val) < 0.2 ? ' active' : '');
+        b.textContent = t.label;
+        b.onclick = () => {
+          customState.targetTemp = t.val;
+          document.querySelectorAll('.dock-btn').forEach(btn => btn.classList.remove('active'));
+          b.classList.add('active');
+        };
+        dockGroup.appendChild(b);
+      });
+    }
+    else if (mode === 'membrane_airlock') {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn';
+      b.innerHTML = '🚪 Запустить цикл шлюза (Airlock m ◁ S)';
+      b.onclick = startAirlockExtraction;
+      hudGroup.appendChild(b);
+    }
+    else if (mode === 'actor_graph_sim') {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn';
+      b.innerHTML = '⚡ Инжектировать всплеск нагрузки';
+      b.onclick = () => {
+        customState.load = 0.95;
+        for (let i = 0; i < 8; i++) {
+          setTimeout(() => {
+            customState.packets.push({
+              from: 1, to: 2, t: 0, speed: 0.02 + Math.random() * 0.01,
+              val: 'Event ' + Math.floor(Math.random() * 99)
+            });
+            customState.packets.push({
+              from: 1, to: 3, t: 0, speed: 0.02 + Math.random() * 0.01,
+              val: 'Event ' + Math.floor(Math.random() * 99)
+            });
+          }, i * 150);
+        }
+      };
+      hudGroup.appendChild(b);
+    }
+    else if (mode === 'reaction_join') {
+      [['order', '＋ Заказ'], ['pay', '＋ Оплата'], ['stock', '＋ Резерв']].forEach(([kind, label]) => {
+        const b = document.createElement('button');
+        b.className = 'dock-btn';
+        b.textContent = label;
+        b.onclick = () => injectJoin(kind);
+        dockGroup.appendChild(b);
+      });
+      const full = document.createElement('button');
+      full.className = 'hud-action-btn';
+      full.innerHTML = '⚡ Полный набор';
+      full.onclick = () => { injectJoin('order'); injectJoin('pay'); injectJoin('stock'); };
+      hudGroup.appendChild(full);
+    }
+    else if (mode === 'confluence_replay') {
+      [['commutative', '✓ Порядок не важен'], ['race', '⚡ Гонка']].forEach(([ex, label]) => {
+        const b = document.createElement('button');
+        b.className = 'dock-btn' + (customState.example === ex ? ' active' : '');
+        b.textContent = label;
+        b.onclick = () => {
+          customState.example = ex;
+          document.querySelectorAll('.dock-btn').forEach(btn => btn.classList.remove('active'));
+          b.classList.add('active');
+        };
+        dockGroup.appendChild(b);
+      });
+    }
+    else if (mode === 'saga_rollback') {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn';
+      b.innerHTML = '▶ Прогнать заново';
+      b.onclick = () => { customState.phase = 'forward'; customState.step = 0; customState.timer = 0; customState.done = [false, false, false]; };
+      hudGroup.appendChild(b);
+    }
+  }
+
+  function triggerNextSieveStep() {
+    if (customState.sieveStep >= customState.primes.length) {
+      customState.sieveStep = 0;
+      particles.forEach(p => { p.state = 'idle'; p.glow = 0; });
+      return;
+    }
+    const prime = customState.primes[customState.sieveStep++];
+    customState.activePrime = prime;
+    const primeP = particles.find(p => p.num === prime);
+    if (primeP) {
+      primeP.state = 'prime';
+      primeP.glow = 1.0;
+      addShockwave(primeP.x, primeP.y, PALETTE.emerald, 100);
+      addSparks(primeP.x, primeP.y, PALETTE.emerald, 24, 6);
+    }
+
+    particles.forEach(p => {
+      if (p.num > prime && p.num % prime === 0 && p.state !== 'eliminated') {
+        p.state = 'eliminated';
+        addSparks(p.x, p.y, '#6b6483', 10, 3);
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN ANIMATION LOOP
+  // ═══════════════════════════════════════════════════════════════════════════
+  function animate() {
+    requestAnimationFrame(animate);
+    animTime += 0.016;
+    ctx.clearRect(0, 0, width, height);
+    drawBackgroundGrid();
+
+    const mode = slidesData[currentSlide].mode;
+    if (mode === 'morph_bridge' || mode === 'tri_world_synthesis') renderMorphScene();
+    else if (mode === 'emergence_swarm') renderSwarmScene();
+    else if (mode === 'chemical_beaker') renderBeakerScene();
+    else if (mode === 'sieve_crystals') renderSieveScene();
+    else if (mode === 'reaction_collider') renderColliderScene();
+    else if (mode === 'thermo_heatcool') renderThermoScene();
+    else if (mode === 'membrane_airlock') renderMembraneScene();
+    else if (mode === 'order_vs_parallel') renderOrderScene();
+    else if (mode === 'actor_graph_sim') renderActorGraphScene();
+    else if (mode === 'reaction_join') renderReactionJoinScene();
+    else if (mode === 'confluence_replay') renderConfluenceScene();
+    else if (mode === 'saga_rollback') renderSagaScene();
+
+    renderEffects();
+  }
+
+  function drawBackgroundGrid() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.05)';
+    ctx.lineWidth = 1;
+    const step = 44;
+    for (let x = 0; x < width; x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+    }
+    for (let y = 0; y < height; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function renderMorphScene() {
+    const targetKey = customState.viewMode || 'cell';
+    const isCell = targetKey === 'cell';
+    const isCham = targetKey === 'cham';
+    const isGraph = targetKey === 'graph';
+
+    particles.forEach((p, i) => {
+      let tx = isCell ? p.cellX : (isCham ? p.chamX : p.graphX);
+      let ty = isCell ? p.cellY : (isCham ? p.chamY : p.graphY);
+
+      if (isCham) {
+        p.chamX += p.chamVx;
+        p.chamY += p.chamVy;
+        if (p.chamX < width * 0.2 || p.chamX > width * 0.8) p.chamVx *= -1;
+        if (p.chamY < height * 0.2 || p.chamY > height * 0.8) p.chamVy *= -1;
+        tx = p.chamX; ty = p.chamY;
+      }
+
+      p.x += (tx - p.x) * 0.08;
+      p.y += (ty - p.y) * 0.08;
+    });
+
+    ctx.save();
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const maxDist = isCell ? 75 : (isGraph ? 100 : 0);
+        if (dist < maxDist) {
+          const alpha = (1 - dist / maxDist) * (isCell ? 0.35 : 0.25);
+          ctx.strokeStyle = isCell ? `rgba(16, 185, 129, ${alpha})` : `rgba(59, 130, 246, ${alpha})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+
+    ctx.save();
+    if (isCell) {
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(width * 0.18, height * 0.15, width * 0.64, height * 0.7);
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.03)';
+      ctx.fillRect(width * 0.18, height * 0.15, width * 0.64, height * 0.7);
+      ctx.fillStyle = PALETTE.emerald;
+      ctx.font = '700 12px Inter';
+      ctx.fillText('РАСТИТЕЛЬНАЯ КЛЕТКА (ELODEA DENSA)', width * 0.2, height * 0.18);
+    } else if (isCham) {
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(width * 0.18, height * 0.15, width * 0.64, height * 0.7, 24);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(168, 85, 247, 0.04)';
+      ctx.fill();
+      ctx.fillStyle = PALETTE.violet;
+      ctx.font = '700 12px Inter';
+      ctx.fillText('ХИМИЧЕСКИЙ РАСТВОР CHAM { … }', width * 0.2, height * 0.18);
+    } else {
+      ctx.fillStyle = PALETTE.blue;
+      ctx.font = '700 12px Inter';
+      ctx.fillText('ТОПОЛОГИЯ РАСПРЕДЕЛЕННЫХ АКЦИЙ', width * 0.2, height * 0.18);
+    }
+    ctx.restore();
+
+    particles.forEach(p => {
+      ctx.save();
+      if (isCell) {
+        ctx.fillStyle = PALETTE.emerald;
+        ctx.shadowColor = PALETTE.emerald;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#062816';
+        ctx.font = '800 10px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Chl', p.x, p.y);
+      } else if (isCham) {
+        const col = p.type === 'a' ? PALETTE.cyan : (p.type === 'abar' ? PALETTE.magenta : PALETTE.white);
+        ctx.fillStyle = col;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius + 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#080512';
+        ctx.font = '800 10px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.type === 'a' ? 'a' : (p.type === 'abar' ? 'ā' : 'R'), p.x, p.y);
+      } else {
+        ctx.fillStyle = PALETTE.blue;
+        ctx.shadowColor = PALETTE.blue;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius + 1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = '700 9px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('A' + (p.id % 9 + 1), p.x, p.y);
+      }
+      ctx.restore();
+    });
+  }
+
+  function renderSwarmScene() {
+    const rule = customState.rule || 'hex_pack';
+
+    // On-canvas "local rule → global result" so emergence is SEEN, not only narrated.
+    const ruleInfo = {
+      hex_pack:       { rule: 'ПРАВИЛО: держись рядом с соседями', res: '↓  плотная упаковка сама собой', color: PALETTE.emerald },
+      wall_avoidance: { rule: 'ПРАВИЛО: держи дистанцию', res: '↓  равномерное распределение', color: PALETTE.cyan },
+      random:         { rule: 'ПРАВИЛА НЕТ', res: '↓  хаос — структура распадается', color: PALETTE.magenta }
+    }[rule] || {};
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = ruleInfo.color || '#fff';
+    ctx.shadowColor = ruleInfo.color || '#000';
+    ctx.shadowBlur = 12;
+    ctx.font = '800 15px Inter';
+    ctx.fillText(ruleInfo.rule || '', width / 2, height * 0.10);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#cfc5e6';
+    ctx.font = '700 13px Inter';
+    ctx.fillText(ruleInfo.res || '', width / 2, height * 0.15);
+    ctx.restore();
+
+    particles.forEach((p, i) => {
+      if (rule === 'hex_pack') {
+        const cols = 8;
+        const r = Math.floor(i / cols);
+        const c = i % cols;
+        const sx = width / 2 - (cols * 36) / 2 + 18;
+        const sy = height / 2 - (6 * 36) / 2 + 18;
+        p.targetX = sx + c * 38 + (r % 2 === 1 ? 19 : 0);
+        p.targetY = sy + r * 34;
+      } else if (rule === 'wall_avoidance') {
+        const side = i % 4;
+        if (side === 0) { p.targetX = width * 0.25; p.targetY = height * 0.25 + (i * 18) % (height * 0.5); }
+        else if (side === 1) { p.targetX = width * 0.75; p.targetY = height * 0.25 + (i * 18) % (height * 0.5); }
+        else if (side === 2) { p.targetX = width * 0.25 + (i * 22) % (width * 0.5); p.targetY = height * 0.22; }
+        else { p.targetX = width * 0.25 + (i * 22) % (width * 0.5); p.targetY = height * 0.78; }
+      } else {
+        p.targetX = p.x + p.vx * 3;
+        p.targetY = p.y + p.vy * 3;
+        if (p.x < width * 0.2 || p.x > width * 0.8) p.vx *= -1;
+        if (p.y < height * 0.2 || p.y > height * 0.8) p.vy *= -1;
+      }
+
+      p.x += (p.targetX - p.x) * 0.06;
+      p.y += (p.targetY - p.y) * 0.06;
+    });
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(width * 0.22, height * 0.18, width * 0.56, height * 0.64);
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.3)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 46) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+
+    particles.forEach(p => {
+      ctx.save();
+      ctx.fillStyle = PALETTE.emerald;
+      ctx.shadowColor = PALETTE.emerald;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  function renderBeakerScene() {
+    const beakerLeft = width * 0.22;
+    const beakerTop = height * 0.18;
+    const beakerWidth = width * 0.56;
+    const beakerHeight = height * 0.64;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.5)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(beakerLeft, beakerTop, beakerWidth, beakerHeight, 28);
+    ctx.stroke();
+
+    const grad = ctx.createLinearGradient(0, beakerTop, 0, beakerTop + beakerHeight);
+    grad.addColorStop(0, 'rgba(168, 85, 247, 0.08)');
+    grad.addColorStop(1, 'rgba(34, 211, 238, 0.08)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(210, 190, 245, 0.8)';
+    ctx.font = '800 12px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('РАСТВОР CHAM { a·P, ā·Q, R, S … }', width / 2, beakerTop + 24);
+    ctx.restore();
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+
+      if (p.x - p.radius < beakerLeft) { p.x = beakerLeft + p.radius; p.vx *= -1; }
+      if (p.x + p.radius > beakerLeft + beakerWidth) { p.x = beakerLeft + beakerWidth - p.radius; p.vx *= -1; }
+      if (p.y - p.radius < beakerTop + 35) { p.y = beakerTop + 35 + p.radius; p.vy *= -1; }
+      if (p.y + p.radius > beakerTop + beakerHeight) { p.y = beakerTop + beakerHeight - p.radius; p.vy *= -1; }
+
+      for (let j = i + 1; j < particles.length; j++) {
+        const p2 = particles[j];
+        const dx = p2.x - p.x;
+        const dy = p2.y - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < p.radius + p2.radius) {
+          const tempVx = p.vx; const tempVy = p.vy;
+          p.vx = p2.vx; p.vy = p2.vy;
+          p2.vx = tempVx; p2.vy = tempVy;
+
+          if ((p.type === 'a' && p2.type === 'abar') || (p.type === 'abar' && p2.type === 'a')) {
+            addShockwave((p.x + p2.x) / 2, (p.y + p2.y) / 2, PALETTE.cyan, 45);
+            addSparks((p.x + p2.x) / 2, (p.y + p2.y) / 2, PALETTE.magenta, 8, 4);
+          }
+        }
+      }
+    }
+
+    particles.forEach(p => {
+      ctx.save();
+      const col = p.type === 'a' ? PALETTE.cyan : (p.type === 'abar' ? PALETTE.magenta : '#94a3b8');
+      
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = 'rgba(18, 12, 34, 0.9)';
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      if (p.val) {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(p.x - 7, p.y - 7, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.font = '800 8px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.val, p.x - 7, p.y - 7);
+      }
+
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 12px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.body, p.x + (p.val ? 4 : 0), p.y);
+      ctx.restore();
+    });
+  }
+
+  function renderSieveScene() {
+    customState.timer += 0.016;
+    if (customState.timer > 1.2) {
+      customState.timer = 0;
+      triggerNextSieveStep();
+    }
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(34, 211, 238, 0.4)';
+    ctx.font = '200 140px Georgia';
+    ctx.fillText('{', width * 0.22, height * 0.52);
+    ctx.fillText('}', width * 0.74, height * 0.52);
+    ctx.restore();
+
+    particles.forEach(p => {
+      ctx.save();
+      const isPrime = p.state === 'prime';
+      const isElim = p.state === 'eliminated';
+
+      if (isPrime) {
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+        ctx.strokeStyle = PALETTE.emerald;
+        ctx.shadowColor = PALETTE.emerald;
+        ctx.shadowBlur = 18;
+        ctx.lineWidth = 2.5;
+      } else if (isElim) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.01)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.lineWidth = 1;
+      } else {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+      }
+
+      ctx.beginPath();
+      ctx.roundRect(p.x - 22, p.y - 22, 44, 44, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isPrime ? '#7ff0b5' : (isElim ? 'rgba(255,255,255,0.15)' : '#fff');
+      ctx.font = '800 16px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.num, p.x, p.y);
+
+      if (isElim) {
+        ctx.strokeStyle = 'rgba(236, 72, 153, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 14, p.y - 14);
+        ctx.lineTo(p.x + 14, p.y + 14);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }
+
+  function renderColliderScene() {
+    const mA = customState.molA;
+    const mB = customState.molB;
+    if (!mA || !mB) return;
+
+    customState.reactionTimer += 0.016;
+
+    if (customState.phase === 'approach') {
+      mA.x += mA.vx;
+      mB.x += mB.vx;
+      if (mA.x >= mA.targetX) {
+        customState.phase = 'collide';
+        customState.reactionTimer = 0;
+        addShockwave(width * 0.5, height * 0.5, '#ffffff', 140);
+        addShockwave(width * 0.5, height * 0.5, PALETTE.cyan, 90);
+        addSparks(width * 0.5, height * 0.5, PALETTE.cyan, 30, 8);
+        addSparks(width * 0.5, height * 0.5, PALETTE.magenta, 30, 8);
+        customState.totalReactions++;
+      }
+    } else if (customState.phase === 'collide') {
+      if (customState.reactionTimer > 0.4) {
+        customState.phase = 'recoil';
+        mA.vx = -4.5;
+        mB.vx = 4.5;
+      }
+    } else if (customState.phase === 'recoil') {
+      mA.x += mA.vx;
+      mB.x += mB.vx;
+      if (customState.reactionTimer > 2.5) {
+        spawnColliderPair();
+      }
+    }
+
+    ctx.save();
+    ctx.fillStyle = '#fff';
+    ctx.font = '800 20px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('{ a·P , ā·Q }  →  { P , Q }', width * 0.5, height * 0.28);
+    ctx.fillStyle = 'rgba(168, 85, 247, 0.7)';
+    ctx.font = '600 13px Inter';
+    ctx.fillText('Рукопожатие валентностей a и ā гасит действие и освобождает тела P и Q', width * 0.5, height * 0.33);
+    ctx.restore();
+
+    [mA, mB].forEach(m => {
+      ctx.save();
+      const isPostReaction = customState.phase === 'recoil';
+      const col = isPostReaction ? PALETTE.emerald : m.color;
+
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 24;
+      ctx.fillStyle = 'rgba(15, 10, 30, 0.95)';
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.radius + 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      if (!isPostReaction) {
+        ctx.fillStyle = m.color;
+        ctx.beginPath();
+        ctx.arc(m.x + (m === mA ? 16 : -16), m.y, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.font = '900 12px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(m.val, m.x + (m === mA ? 16 : -16), m.y);
+      }
+
+      ctx.fillStyle = '#fff';
+      ctx.font = '900 18px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(m.body, m.x + (!isPostReaction ? (m === mA ? -8 : 8) : 0), m.y);
+      ctx.restore();
+    });
+  }
+
+  function renderThermoScene() {
+    customState.temp += (customState.targetTemp - customState.temp) * 0.05;
+    const temp = customState.temp;
+
+    ctx.save();
+    const barX = width * 0.22;
+    const barY = height * 0.28;
+    const barH = height * 0.44;
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(barX, barY, 18, barH);
+
+    const fillH = barH * temp;
+    const grad = ctx.createLinearGradient(0, barY + barH, 0, barY);
+    grad.addColorStop(0, PALETTE.blue);
+    grad.addColorStop(0.5, PALETTE.amber);
+    grad.addColorStop(1, PALETTE.magenta);
+    ctx.fillStyle = grad;
+    ctx.fillRect(barX + 2, barY + barH - fillH, 14, fillH);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 11px JetBrains Mono';
+    ctx.fillText('ТЕМПЕРАТУРА T', barX - 10, barY - 12);
+    ctx.fillText(Math.round(temp * 100) + '°C', barX + 26, barY + barH - fillH + 4);
+    ctx.restore();
+
+    const splitDist = temp * 65;
+    particles.forEach((p, i) => {
+      const offsetX = (i % 2 === 0 ? -splitDist : splitDist);
+      const jitter = (Math.random() - 0.5) * temp * 6;
+      p.x = p.baseX + offsetX + jitter;
+      p.y = p.baseY + jitter;
+
+      ctx.save();
+      const col = i % 2 === 0 ? PALETTE.cyan : PALETTE.magenta;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = 'rgba(15, 10, 30, 0.9)';
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 14px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(i % 2 === 0 ? 'a' : 'b·P', p.x, p.y);
+      ctx.restore();
+    });
+
+    if (temp < 0.6) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(245, 158, 11, ${1 - temp / 0.6})`;
+      ctx.lineWidth = 3;
+      for (let i = 0; i < particles.length; i += 2) {
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[i + 1].x, particles[i + 1].y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  // ── Mode 7: High-Fidelity Animated Membrane & Airlock ($m \triangleleft S$) ─────────────────
+  function renderMembraneScene() {
+    const memX = width * 0.32;
+    const memY = height * 0.5;
+    const memR = Math.min(width * 0.22, 140);
+
+    // Airlock Chamber Geometry
+    const chamberW = 90;
+    const chamberH = 70;
+    const chamberX = memX + memR; // starts right on the membrane boundary
+    const chamberY = memY - chamberH / 2;
+
+    const innerDoorX = chamberX;
+    const outerDoorX = chamberX + chamberW;
+
+    // Airlock State Machine & Physical Door Interpolation
+    const stage = customState.airlockStage || 'idle';
+    customState.airlockTimer += 0.016;
+
+    if (stage === 'approach_inner') {
+      // Inner door opens smoothly
+      customState.innerDoorOpen = Math.min(1.0, customState.innerDoorOpen + 0.05);
+      customState.outerDoorOpen = Math.max(0.0, customState.outerDoorOpen - 0.05);
+
+      if (customState.transitMol) {
+        const targetX = chamberX + chamberW * 0.5;
+        const targetY = memY;
+        customState.transitMol.x += (targetX - customState.transitMol.x) * 0.05;
+        customState.transitMol.y += (targetY - customState.transitMol.y) * 0.05;
+
+        if (Math.abs(customState.transitMol.x - targetX) < 8) {
+          customState.airlockStage = 'docked_isolated';
+          customState.airlockTimer = 0;
+          customState.statusMessage = '2. Изоляция m ◁ S: люк запечатан в камере';
+          addShockwave(targetX, targetY, PALETTE.violet, 50);
+          addSparks(innerDoorX, memY, PALETTE.amber, 12, 4);
+        }
+      }
+    }
+    else if (stage === 'docked_isolated') {
+      // Inner door snaps shut!
+      customState.innerDoorOpen = Math.max(0.0, customState.innerDoorOpen - 0.08);
+      customState.outerDoorOpen = 0.0;
+
+      if (customState.airlockTimer > 0.8) {
+        customState.airlockStage = 'outer_open';
+        customState.airlockTimer = 0;
+        customState.statusMessage = '3. Внешний шлюз открыт: выброс в раствор...';
+        addSparks(outerDoorX, memY, PALETTE.cyan, 14, 4);
+      }
+    }
+    else if (stage === 'outer_open') {
+      // Outer door opens!
+      customState.outerDoorOpen = Math.min(1.0, customState.outerDoorOpen + 0.06);
+
+      if (customState.transitMol) {
+        const exitX = chamberX + chamberW + 80;
+        customState.transitMol.x += (exitX - customState.transitMol.x) * 0.06;
+
+        if (customState.transitMol.x > chamberX + chamberW + 40) {
+          customState.airlockStage = 'ejected';
+          customState.airlockTimer = 0;
+          customState.transitMol.location = 'outer';
+          customState.transitMol.type = 'a';
+          customState.transitMol.label = 'm';
+          customState.statusMessage = '4. Экспорт завершен: { m, S } ⇌ m + { S }';
+          addShockwave(customState.transitMol.x, memY, PALETTE.cyan, 90);
+          addSparks(customState.transitMol.x, memY, PALETTE.emerald, 24, 6);
+        }
+      }
+    }
+    else if (stage === 'ejected') {
+      // Outer door closes back to idle
+      customState.outerDoorOpen = Math.max(0.0, customState.outerDoorOpen - 0.04);
+      customState.innerDoorOpen = 0.0;
+      if (customState.airlockTimer > 2.0) {
+        customState.airlockStage = 'idle';
+        customState.statusMessage = 'Шлюз закрыт · { S } изолирован';
+      }
+    } else {
+      customState.innerDoorOpen = Math.max(0.0, customState.innerDoorOpen - 0.05);
+      customState.outerDoorOpen = Math.max(0.0, customState.outerDoorOpen - 0.05);
+    }
+
+    // ── 1. Draw Main Membrane Circle { S } ──
+    ctx.save();
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.8)';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([9, 6]);
+    ctx.beginPath();
+    ctx.arc(memX, memY, memR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = 'rgba(168, 85, 247, 0.06)';
+    ctx.fill();
+
+    // Title label
+    ctx.fillStyle = PALETTE.violet;
+    ctx.font = '800 13px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('{ S } ПОДРАСТВОР', memX, memY - memR - 16);
+    ctx.font = '600 11px Inter';
+    ctx.fillStyle = 'rgba(210, 190, 245, 0.7)';
+    ctx.fillText('Изолированная подсистема', memX, memY - memR - 2);
+    ctx.restore();
+
+    // ── 2. Draw Airlock Chamber ($m \triangleleft S$) ──
+    ctx.save();
+    // Chamber background
+    ctx.fillStyle = 'rgba(18, 12, 34, 0.95)';
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.6)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.roundRect(chamberX, chamberY, chamberW, chamberH, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    // Chamber label
+    ctx.fillStyle = PALETTE.cyan;
+    ctx.font = '800 10px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('AIRLOCK', chamberX + chamberW / 2, chamberY - 8);
+    ctx.fillStyle = '#fff';
+    ctx.font = '800 11px JetBrains Mono';
+    ctx.fillText('m ◁ S', chamberX + chamberW / 2, chamberY + chamberH / 2 - 14);
+
+    // Inner Door Mechanical Visualization
+    const innerDoorH = (1 - customState.innerDoorOpen) * (chamberH - 8);
+    ctx.strokeStyle = customState.innerDoorOpen > 0.2 ? PALETTE.emerald : PALETTE.amber;
+    ctx.fillStyle = customState.innerDoorOpen > 0.2 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.rect(innerDoorX - 4, chamberY + 4 + (chamberH - 8 - innerDoorH) / 2, 8, innerDoorH);
+    ctx.fill();
+    ctx.stroke();
+
+    // Outer Door Mechanical Visualization
+    const outerDoorH = (1 - customState.outerDoorOpen) * (chamberH - 8);
+    ctx.strokeStyle = customState.outerDoorOpen > 0.2 ? PALETTE.emerald : PALETTE.amber;
+    ctx.fillStyle = customState.outerDoorOpen > 0.2 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.rect(outerDoorX - 4, chamberY + 4 + (chamberH - 8 - outerDoorH) / 2, 8, outerDoorH);
+    ctx.fill();
+    ctx.stroke();
+
+    // Status Pill on canvas
+    ctx.fillStyle = 'rgba(8, 5, 18, 0.9)';
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(chamberX - 30, chamberY + chamberH + 14, chamberW + 60, 26, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = stage === 'idle' ? '#9f94b8' : (stage === 'ejected' ? '#7ff0b5' : '#fed7aa');
+    ctx.font = '700 9px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(customState.statusMessage, chamberX + chamberW / 2, chamberY + chamberH + 30);
+    ctx.restore();
+
+    // ── 3. Update & Render Particles ──
+    particles.forEach(p => {
+      if (p.location === 'in_transit') {
+        // Position controlled by state machine above
+      } else if (p.location === 'subsolution') {
+        p.x += p.vx;
+        p.y += p.vy;
+        const dx = p.x - memX;
+        const dy = p.y - memY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > memR - p.radius) {
+          p.vx *= -1; p.vy *= -1;
+        }
+      } else {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < width * 0.58 || p.x > width * 0.9) p.vx *= -1;
+        if (p.y < height * 0.2 || p.y > height * 0.8) p.vy *= -1;
+      }
+
+      ctx.save();
+      const isTransit = p.location === 'in_transit';
+      const col = isTransit ? '#ffffff' : (p.type === 'a' ? PALETTE.cyan : PALETTE.magenta);
+
+      ctx.fillStyle = isTransit ? 'rgba(255,255,255,0.95)' : col;
+      ctx.shadowColor = isTransit ? PALETTE.cyan : col;
+      ctx.shadowBlur = isTransit ? 24 : 12;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = isTransit ? '#000' : '#fff';
+      ctx.font = '900 11px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.label, p.x, p.y);
+      ctx.restore();
+    });
+  }
+
+  function renderOrderScene() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(width * 0.15, height * 0.2, width * 0.32, height * 0.6);
+    ctx.fillStyle = 'rgba(34, 211, 238, 0.04)';
+    ctx.fillRect(width * 0.15, height * 0.2, width * 0.32, height * 0.6);
+
+    ctx.fillStyle = PALETTE.cyan;
+    ctx.font = '800 16px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText('ПАРАЛЛЕЛЬНО { a, b, c }', width * 0.31, height * 0.26);
+    ctx.font = '500 12px Inter';
+    ctx.fillStyle = '#9fd9e3';
+    ctx.fillText('Порядка нет — всё сразу', width * 0.31, height * 0.3);
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(width * 0.55, height * 0.2, width * 0.32, height * 0.6);
+    ctx.fillStyle = 'rgba(168, 85, 247, 0.04)';
+    ctx.fillRect(width * 0.55, height * 0.2, width * 0.32, height * 0.6);
+
+    ctx.fillStyle = PALETTE.violet;
+    ctx.font = '800 16px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText('ПОСЛЕДОВАТЕЛЬНО a · b · c', width * 0.71, height * 0.26);
+    ctx.font = '500 12px Inter';
+    ctx.fillStyle = '#c8b9e6';
+    ctx.fillText('Порядок задан структурой', width * 0.71, height * 0.3);
+
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.7)';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 2; i++) {
+      const y1 = height * 0.35 + i * 85 + 24;
+      const y2 = height * 0.35 + (i + 1) * 85 - 24;
+      ctx.beginPath();
+      ctx.moveTo(width * 0.71, y1);
+      ctx.lineTo(width * 0.71, y2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    particles.forEach(p => {
+      if (p.side === 'left') {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < width * 0.18 || p.x > width * 0.44) p.vx *= -1;
+        if (p.y < height * 0.35 || p.y > height * 0.74) p.vy *= -1;
+      }
+      ctx.save();
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#000';
+      ctx.font = '800 13px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.label, p.x, p.y);
+      ctx.restore();
+    });
+  }
+
+  function renderActorGraphScene() {
+    const nodes = customState.nodes || [];
+    const packets = customState.packets || [];
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(nodes[0].x, nodes[0].y); ctx.lineTo(nodes[1].x, nodes[1].y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(nodes[0].x, nodes[0].y); ctx.lineTo(nodes[2].x, nodes[2].y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(nodes[1].x, nodes[1].y); ctx.lineTo(nodes[3].x, nodes[3].y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(nodes[2].x, nodes[2].y); ctx.lineTo(nodes[3].x, nodes[3].y); ctx.stroke();
+    ctx.restore();
+
+    for (let i = packets.length - 1; i >= 0; i--) {
+      const pkt = packets[i];
+      pkt.t += pkt.speed;
+      const nFrom = nodes.find(n => n.id === pkt.from);
+      const nTo = nodes.find(n => n.id === pkt.to);
+      if (!nFrom || !nTo) continue;
+
+      const px = nFrom.x + (nTo.x - nFrom.x) * pkt.t;
+      const py = nFrom.y + (nTo.y - nFrom.y) * pkt.t;
+
+      ctx.save();
+      ctx.fillStyle = PALETTE.amber;
+      ctx.shadowColor = PALETTE.amber;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(px, py, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      if (pkt.t >= 1) {
+        addShockwave(nTo.x, nTo.y, PALETTE.cyan, 40);
+        packets.splice(i, 1);
+      }
+    }
+
+    if (Math.random() < 0.05) packets.push({ from: 1, to: 2, t: 0, speed: 0.015 });
+    if (Math.random() < 0.05) packets.push({ from: 1, to: 3, t: 0, speed: 0.015 });
+
+    nodes.forEach(n => {
+      ctx.save();
+      ctx.fillStyle = n.color;
+      ctx.shadowColor = n.color;
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 12px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(n.name, n.x, n.y);
+      ctx.restore();
+    });
+  }
+
+  // ── Mode 10: Reaction node — fires only when ALL inputs have met (join by content) ──
+  function renderReactionJoinScene() {
+    const g = joinGeom();
+    const kinds = ['order', 'pay', 'stock'];
+    customState.tokens = customState.tokens || [];
+    customState.products = customState.products || [];
+    if (!customState.slots) customState.slots = { order: null, pay: null, stock: null };
+    if (customState.spawnTimer === undefined) customState.spawnTimer = 1;
+    if (customState.flash === undefined) customState.flash = 0;
+
+    // Auto-stream so the scene lives without interaction
+    customState.spawnTimer -= 0.016;
+    if (customState.spawnTimer <= 0) {
+      customState.spawnTimer = 0.75 + Math.random() * 0.85;
+      injectJoin(kinds[Math.floor(Math.random() * 3)]);
+    }
+    if (customState.flash > 0) customState.flash -= 0.05;
+
+    // Assignment: fill each empty slot with the oldest waiting token of that kind
+    kinds.forEach(k => {
+      if (!customState.slots[k]) {
+        const t = customState.tokens.find(tk => tk.kind === k && !tk.assigned);
+        if (t) { t.assigned = true; customState.slots[k] = t; }
+      }
+    });
+
+    // Input lanes + source chips
+    kinds.forEach(k => {
+      const s = g.sources[k], slot = g.slots[k], kd = JOIN_KINDS[k];
+      ctx.save();
+      ctx.strokeStyle = kd.color + '55';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 7]);
+      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(slot.x, slot.y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(8,5,18,0.9)';
+      ctx.strokeStyle = kd.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(s.x - 54, s.y - 16, 108, 32, 9); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = kd.color;
+      ctx.font = '800 13px Inter';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(kd.label, s.x, s.y);
+      ctx.restore();
+    });
+
+    // Move tokens toward slot (assigned) or a holding spot (waiting)
+    customState.tokens.forEach(t => {
+      const target = t.assigned ? g.slots[t.kind] : { x: g.sources[t.kind].x + 78, y: g.sources[t.kind].y };
+      t.x += (target.x - t.x) * 0.12;
+      t.y += (target.y - t.y) * 0.12;
+      if (t.assigned && Math.hypot(target.x - t.x, target.y - t.y) < 6) t.arrived = true;
+    });
+
+    // Fire when all three slots are filled and their tokens have arrived
+    const filled = kinds.filter(k => customState.slots[k]);
+    const ready = filled.length === 3 && kinds.every(k => customState.slots[k].arrived);
+    if (ready) {
+      customState.count = (customState.count || 0) + 1;
+      customState.flash = 1;
+      addShockwave(g.cx, g.cy, '#ffffff', g.r * 1.7);
+      kinds.forEach(k => addSparks(g.cx, g.cy, JOIN_KINDS[k].color, 14, 7));
+      const consumed = kinds.map(k => customState.slots[k]);
+      customState.tokens = customState.tokens.filter(t => !consumed.includes(t));
+      customState.slots = { order: null, pay: null, stock: null };
+      customState.products.push({ x: g.cx, y: g.cy });
+    }
+
+    // Reactor body (hexagon)
+    ctx.save();
+    const pulse = 0.5 + 0.5 * Math.sin(animTime * 3);
+    const glow = customState.flash > 0 ? '#ffffff' : (filled.length === 3 ? PALETTE.emerald : PALETTE.violet);
+    ctx.strokeStyle = glow;
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 20 + (customState.flash > 0 ? 40 : filled.length * 6) + pulse * 6;
+    ctx.lineWidth = 4;
+    ctx.fillStyle = 'rgba(14,9,26,0.92)';
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 6 + i * Math.PI / 3;
+      const px = g.cx + g.r * Math.cos(a), py = g.cy + g.r * Math.sin(a);
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // Reactor label: join pattern + live status
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.font = '900 12px JetBrains Mono';
+    ctx.fillText('REACTION', g.cx, g.cy - 28);
+    ctx.font = '700 11px Inter';
+    ctx.fillStyle = '#cfc5e6';
+    ctx.fillText('Заказ · Оплата · Резерв', g.cx, g.cy - 8);
+    ctx.fillStyle = PALETTE.emerald;
+    ctx.font = '800 12px Inter';
+    ctx.fillText('→ Отгрузка', g.cx, g.cy + 12);
+    ctx.font = '800 12px Inter';
+    ctx.fillStyle = customState.flash > 0 ? '#fff' : (filled.length === 3 ? PALETTE.emerald : PALETTE.amber);
+    ctx.fillText(customState.flash > 0.4 ? '⚡ РЕАКЦИЯ' : 'ждёт ' + filled.length + '/3', g.cx, g.cy + 34);
+    ctx.restore();
+
+    // Slot rings on the rim (dashed = empty, solid = occupied)
+    kinds.forEach(k => {
+      const slot = g.slots[k], kd = JOIN_KINDS[k], occupied = !!customState.slots[k];
+      ctx.save();
+      ctx.strokeStyle = kd.color;
+      ctx.lineWidth = 2.5;
+      if (!occupied) ctx.setLineDash([4, 4]);
+      ctx.globalAlpha = occupied ? 1 : 0.5;
+      ctx.beginPath(); ctx.arc(slot.x, slot.y, 13, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    });
+
+    // Input tokens
+    customState.tokens.forEach(t => {
+      const kd = JOIN_KINDS[t.kind];
+      ctx.save();
+      ctx.fillStyle = kd.color;
+      ctx.shadowColor = kd.color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(t.x, t.y, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#06040b';
+      ctx.font = '900 11px JetBrains Mono';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(kd.short, t.x, t.y);
+      ctx.restore();
+    });
+
+    // Products flying to the exit
+    for (let i = customState.products.length - 1; i >= 0; i--) {
+      const p = customState.products[i];
+      p.x += (g.exit.x - p.x) * 0.08;
+      p.y += (g.exit.y - p.y) * 0.08;
+      ctx.save();
+      ctx.fillStyle = PALETTE.emerald;
+      ctx.shadowColor = PALETTE.emerald;
+      ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 15, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#06040b';
+      ctx.font = '900 12px JetBrains Mono';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✓', p.x, p.y);
+      ctx.restore();
+      if (Math.hypot(g.exit.x - p.x, g.exit.y - p.y) < 12) {
+        addSparks(g.exit.x, g.exit.y, PALETTE.emerald, 10, 4);
+        customState.products.splice(i, 1);
+      }
+    }
+
+    // Exit marker + reaction counter
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = PALETTE.emerald;
+    ctx.font = '800 12px Inter';
+    ctx.fillText('Отгрузка ✓', g.exit.x, g.exit.y - 32);
+    ctx.fillStyle = '#9f94b8';
+    ctx.font = '700 12px JetBrains Mono';
+    ctx.fillText('реакций: ' + (customState.count || 0), g.cx, g.cy + g.r + 32);
+    ctx.restore();
+  }
+
+  // ── Mode 11: Confluence check (order matters?) + Replay ──
+  function renderConfluenceScene() {
+    const ex = customState.example || 'commutative';
+    const start = 100;
+    const ops = ex === 'commutative'
+      ? { A: { label: '+ 10', f: v => v + 10 }, B: { label: '+ 5', f: v => v + 5 } }
+      : { A: { label: '− 100', f: v => v - 100 }, B: { label: '× 1.05', f: v => Math.round(v * 1.05) } };
+    const r1 = ops.B.f(ops.A.f(start)); // порядок A → B
+    const r2 = ops.A.f(ops.B.f(start)); // порядок B → A
+    const confluent = r1 === r2;
+
+    const sx = width * 0.13, cy = height * 0.5;
+    const topY = height * 0.33, botY = height * 0.67;
+    const x1 = width * 0.35, xi = width * 0.5, x2 = width * 0.61, xr = width * 0.74;
+    const vxb = width * 0.88;
+
+    const box = (x, y, text, color, big) => {
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,7,20,0.94)';
+      ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+      ctx.shadowColor = color; ctx.shadowBlur = 12;
+      const w = big ? 78 : 64, h = big ? 46 : 40;
+      ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, 10); ctx.fill(); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fff'; ctx.font = (big ? '900 18px' : '800 15px') + ' JetBrains Mono';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    };
+    const opChip = (x, y, label, color) => {
+      ctx.save();
+      ctx.strokeStyle = color + '99'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+      ctx.beginPath(); ctx.moveTo(x - 42, y); ctx.lineTo(x + 42, y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.moveTo(x + 42, y); ctx.lineTo(x + 33, y - 5); ctx.lineTo(x + 33, y + 5); ctx.closePath(); ctx.fill();
+      ctx.font = '800 13px JetBrains Mono'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, x, y - 20);
+      ctx.restore();
+    };
+
+    // Connectors start → lanes
+    ctx.save();
+    ctx.strokeStyle = 'rgba(159,148,184,0.4)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(sx + 36, cy - 12); ctx.lineTo(x1 - 42, topY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx + 36, cy + 12); ctx.lineTo(x1 - 42, botY); ctx.stroke();
+    ctx.restore();
+
+    // Start
+    box(sx, cy, 'S=' + start, PALETTE.violet, true);
+    ctx.save(); ctx.fillStyle = '#9f94b8'; ctx.font = '700 12px Inter'; ctx.textAlign = 'center';
+    ctx.fillText('старт', sx, cy - 42); ctx.restore();
+
+    // Lane labels
+    ctx.save(); ctx.textAlign = 'left';
+    ctx.fillStyle = '#9fd9e3'; ctx.font = '800 12px Inter';
+    ctx.fillText('порядок 1:  A → B', sx - 24, topY - 46);
+    ctx.fillStyle = '#f3b6d6';
+    ctx.fillText('порядок 2:  B → A', sx - 24, botY + 52);
+    ctx.restore();
+
+    // Top lane A→B
+    opChip(x1, topY, ops.A.label, PALETTE.cyan);
+    box(xi, topY, String(ops.A.f(start)), PALETTE.cyan);
+    opChip(x2, topY, ops.B.label, PALETTE.magenta);
+    box(xr, topY, String(r1), confluent ? PALETTE.emerald : '#ef4444', true);
+
+    // Bottom lane B→A
+    opChip(x1, botY, ops.B.label, PALETTE.magenta);
+    box(xi, botY, String(ops.B.f(start)), PALETTE.magenta);
+    opChip(x2, botY, ops.A.label, PALETTE.cyan);
+    box(xr, botY, String(r2), confluent ? PALETTE.emerald : '#ef4444', true);
+
+    // Moving dots (life)
+    const p = (animTime * 0.4) % 1;
+    ctx.save();
+    ctx.fillStyle = PALETTE.cyan; ctx.shadowColor = PALETTE.cyan; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(sx + (xr - sx) * p, topY, 5, 0, 7); ctx.fill();
+    ctx.fillStyle = PALETTE.magenta; ctx.shadowColor = PALETTE.magenta;
+    ctx.beginPath(); ctx.arc(sx + (xr - sx) * ((p + 0.5) % 1), botY, 5, 0, 7); ctx.fill();
+    ctx.restore();
+
+    // Verdict: converge (green) or diverge (red)
+    const vcol = confluent ? PALETTE.emerald : '#ef4444';
+    ctx.save();
+    ctx.strokeStyle = vcol; ctx.lineWidth = 3; ctx.shadowColor = vcol; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.moveTo(xr + 42, topY); ctx.lineTo(vxb - 46, confluent ? cy : topY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(xr + 42, botY); ctx.lineTo(vxb - 46, confluent ? cy : botY); ctx.stroke();
+    // badge
+    ctx.fillStyle = 'rgba(10,7,20,0.96)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(vxb - 44, cy - 40, 108, 80, 12); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = vcol; ctx.font = '900 20px JetBrains Mono';
+    ctx.fillText(confluent ? '=' : '≠', vxb + 10, cy - 16);
+    ctx.font = '800 13px Inter'; ctx.fillStyle = '#fff';
+    ctx.fillText(confluent ? 'детермини-' : '⚡ ГОНКА', vxb + 10, cy + 6);
+    ctx.font = '700 11px Inter'; ctx.fillStyle = confluent ? '#a7e5ce' : '#fca5a5';
+    ctx.fillText(confluent ? 'ровано' : (r1 + ' vs ' + r2), vxb + 10, cy + 24);
+    ctx.restore();
+
+    // Replay tape (top center)
+    customState.replayHead = ((customState.replayHead || 0) + 0.006) % 1;
+    const rbx1 = width * 0.36, rbx2 = width * 0.64, rby = height * 0.12;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34,211,238,0.55)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(rbx1, rby); ctx.lineTo(rbx2, rby); ctx.stroke();
+    [0, 0.5, 1].forEach(t => {
+      ctx.fillStyle = PALETTE.cyan;
+      ctx.beginPath(); ctx.arc(rbx1 + (rbx2 - rbx1) * t, rby, 4, 0, 7); ctx.fill();
+    });
+    const ph = rbx1 + (rbx2 - rbx1) * customState.replayHead;
+    ctx.fillStyle = '#fff'; ctx.shadowColor = PALETTE.cyan; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(ph, rby, 7, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0; ctx.fillStyle = PALETTE.cyan; ctx.font = '800 12px Inter'; ctx.textAlign = 'center';
+    ctx.fillText('▮ REPLAY — саппорт переигрывает события инстанса → тот же итог', (rbx1 + rbx2) / 2, rby - 18);
+    ctx.restore();
+  }
+
+  // ── Mode 12: SAGA rollback (reversibility ⇌) ──
+  function renderSagaScene() {
+    const steps = ['Списать A', 'Зачислить B', 'Отправить чек'];
+    const n = steps.length;
+    const cy = height * 0.44;
+    const x0 = width * 0.18, xN = width * 0.82;
+    const nodeX = i => x0 + (xN - x0) * (i / (n - 1));
+    if (!customState.done) customState.done = [false, false, false];
+    if (customState.failAt === undefined) customState.failAt = 1;
+    customState.timer = (customState.timer || 0) + 0.016;
+    const STEP_T = 0.8;
+
+    if (customState.phase === 'forward') {
+      if (customState.timer > STEP_T) {
+        customState.timer = 0;
+        const i = customState.step;
+        if (i === customState.failAt) {
+          customState.phase = 'failed';
+          addShockwave(nodeX(i), cy, '#ef4444', 100);
+          addSparks(nodeX(i), cy, '#ef4444', 22, 6);
+        } else {
+          customState.done[i] = true;
+          addSparks(nodeX(i), cy, PALETTE.emerald, 12, 4);
+          customState.step++;
+          if (customState.step >= n) customState.phase = 'restored';
+        }
+      }
+    } else if (customState.phase === 'failed') {
+      if (customState.timer > 1.0) { customState.timer = 0; customState.phase = 'rollback'; customState.step = customState.failAt - 1; }
+    } else if (customState.phase === 'rollback') {
+      if (customState.timer > STEP_T) {
+        customState.timer = 0;
+        const i = customState.step;
+        if (i >= 0 && customState.done[i]) {
+          customState.done[i] = false;
+          addSparks(nodeX(i), cy, PALETTE.amber, 14, 4);
+          customState.step--;
+        } else {
+          customState.phase = 'restored';
+        }
+      }
+    } else if (customState.phase === 'restored') {
+      if (customState.timer > 2.4) {
+        customState.timer = 0; customState.phase = 'forward'; customState.step = 0; customState.done = [false, false, false];
+      }
+    }
+
+    // Connectors
+    ctx.save();
+    ctx.strokeStyle = 'rgba(159,148,184,0.35)'; ctx.lineWidth = 3;
+    for (let i = 0; i < n - 1; i++) { ctx.beginPath(); ctx.moveTo(nodeX(i) + 40, cy); ctx.lineTo(nodeX(i + 1) - 40, cy); ctx.stroke(); }
+    ctx.restore();
+
+    // Rollback sweep arrow (right → left)
+    if (customState.phase === 'rollback' || customState.phase === 'failed') {
+      ctx.save();
+      ctx.strokeStyle = PALETTE.amber; ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
+      ctx.beginPath(); ctx.moveTo(nodeX(customState.failAt), cy - 60); ctx.lineTo(nodeX(0), cy - 60); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = PALETTE.amber;
+      ctx.beginPath(); ctx.moveTo(nodeX(0), cy - 60); ctx.lineTo(nodeX(0) + 10, cy - 65); ctx.lineTo(nodeX(0) + 10, cy - 55); ctx.closePath(); ctx.fill();
+      ctx.font = '800 13px Inter'; ctx.textAlign = 'center';
+      ctx.fillText('↩ откат в обратном порядке', (nodeX(0) + nodeX(customState.failAt)) / 2, cy - 72);
+      ctx.restore();
+    }
+
+    // Nodes
+    for (let i = 0; i < n; i++) {
+      const x = nodeX(i);
+      const isFail = (customState.phase === 'failed' || customState.phase === 'rollback') && i === customState.failAt;
+      const isActive = customState.phase === 'forward' && i === customState.step;
+      const col = customState.done[i] ? PALETTE.emerald : (isFail ? '#ef4444' : (isActive ? PALETTE.violet : '#4b4463'));
+      ctx.save();
+      ctx.fillStyle = 'rgba(12,8,22,0.95)'; ctx.strokeStyle = col; ctx.lineWidth = 3.5;
+      ctx.shadowColor = col; ctx.shadowBlur = isActive || isFail ? 22 : 12;
+      ctx.beginPath(); ctx.arc(x, cy, 36, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = col; ctx.font = '900 22px JetBrains Mono'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(customState.done[i] ? '✓' : (isFail ? '✗' : (i + 1)), x, cy);
+      // label
+      ctx.fillStyle = '#cfc5e6'; ctx.font = '700 13px Inter'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(steps[i], x, cy + 60);
+      ctx.restore();
+    }
+
+    // Status + reversibility symbol
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = PALETTE.amber; ctx.font = '900 30px JetBrains Mono';
+    ctx.fillText('⇌', width * 0.5, cy - 118);
+    let msg = '', mcol = '#fff';
+    if (customState.phase === 'forward') { msg = 'Выполняется: ' + steps[customState.step]; mcol = PALETTE.violet; }
+    else if (customState.phase === 'failed') { msg = '✗ Шаг упал: «' + steps[customState.failAt] + '» — нужен откат'; mcol = '#ef4444'; }
+    else if (customState.phase === 'rollback') { msg = '↩ Откат: отменяем «' + steps[Math.max(0, customState.step)] + '»'; mcol = PALETTE.amber; }
+    else { msg = '✓ Состояние восстановлено — всё целостно'; mcol = PALETTE.emerald; }
+    ctx.fillStyle = mcol; ctx.font = '800 15px Inter';
+    ctx.fillText(msg, width * 0.5, height * 0.82);
+    ctx.restore();
+  }
+
+  function renderEffects() {
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const sw = shockwaves[i];
+      sw.radius += (sw.maxRadius - sw.radius) * 0.12;
+      sw.life -= sw.decay;
+      if (sw.life <= 0) {
+        shockwaves.splice(i, 1);
+        continue;
+      }
+      ctx.save();
+      ctx.strokeStyle = sw.color;
+      ctx.globalAlpha = sw.life;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.x += sp.vx;
+      sp.y += sp.vy;
+      sp.life -= sp.decay;
+      if (sp.life <= 0) {
+        sparks.splice(i, 1);
+        continue;
+      }
+      ctx.save();
+      ctx.fillStyle = sp.color;
+      ctx.globalAlpha = sp.life;
+      ctx.shadowColor = sp.color;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UI & STORY INTERACTION CONTROLLER
+  // ═══════════════════════════════════════════════════════════════════════════
+  const topNav = document.getElementById('top-nav');
+  const deckScroll = document.getElementById('deck-scroll');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  const btnPlay = document.getElementById('btn-play');
+  const btnRestart = document.getElementById('btn-restart');
+  const voiceToggle = document.getElementById('voice-toggle');
+  const progressBar = document.getElementById('progress-bar');
+  const slideCounter = document.getElementById('slide-counter');
+  const captionText = document.getElementById('stage-caption-text');
+  const sceneNote = document.getElementById('stage-scene-note');
+  const btnPresenter = document.getElementById('btn-presenter');
+
+  const storyNavBadges = [];
+  const slideViews = [];
+
+  // Per-scene color → meaning legend (drives the bottom-left overlay).
+  const LEGENDS = {
+    morph_bridge:        [['#10b981', '🌿 клетка'], ['#a855f7', '⚗️ раствор CHAM'], ['#3b82f6', '⬡ граф simulator']],
+    tri_world_synthesis: [['#10b981', '🌿 клетка'], ['#a855f7', '⚗️ CHAM'], ['#3b82f6', '⬡ граф simulator']],
+    emergence_swarm:     [['#10b981', 'участник'], ['#0e6f52', 'локальная связь']],
+    chemical_beaker:     [['#22d3ee', 'ион a·P'], ['#ec4899', 'ион ā·Q'], ['#94a3b8', 'тело R · S']],
+    sieve_crystals:      [['#10b981', 'простое (осталось)'], ['#6b6483', 'вычеркнуто (кратное)']],
+    reaction_collider:   [['#22d3ee', 'ион a·P'], ['#ec4899', 'ион ā·Q'], ['#10b981', 'продукт P, Q']],
+    thermo_heatcool:     [['#ec4899', 'горячо → распад на ионы'], ['#3b82f6', 'холодно → сборка в цепь'], ['#f59e0b', 'связь']],
+    membrane_airlock:    [['#a855f7', 'мембрана { S }'], ['#22d3ee', 'шлюз airlock m ◁ S'], ['#10b981', 'дверь открыта']],
+    order_vs_parallel:   [['#22d3ee', 'параллельно { a, b, c }'], ['#a855f7', 'цепь a · b · c']],
+    actor_graph_sim:     [['#3b82f6', 'актор'], ['#f59e0b', 'событие в пути']],
+    reaction_join:       [['#22d3ee', 'Заказ'], ['#ec4899', 'Оплата'], ['#f59e0b', 'Резерв'], ['#10b981', 'Отгрузка (продукт)']],
+    confluence_replay:   [['#10b981', 'сошлось → безопасно'], ['#ef4444', 'разошлось → гонка'], ['#22d3ee', 'Replay-переигровка']],
+    saga_rollback:       [['#10b981', 'шаг выполнен'], ['#ef4444', 'шаг упал'], ['#f59e0b', 'откат (компенсация)']]
+  };
+  const legendEl = document.getElementById('stage-legend');
+  const stageFade = document.getElementById('stage-fade');
+
+  function updateLegend(index) {
+    const rows = LEGENDS[slidesData[index].mode];
+    if (!rows) { legendEl.style.display = 'none'; return; }
+    legendEl.style.display = 'flex';
+    legendEl.innerHTML = '<div class="legend-title">Обозначения</div>' + rows.map(
+      ([c, label]) => `<div class="legend-item"><span class="legend-dot" style="background:${c};color:${c}"></span>${label}</div>`
+    ).join('');
+  }
+
+  function buildUI() {
+    slidesData.forEach((s, idx) => {
+      if (idx > 0) {
+        const sep = document.createElement('span');
+        sep.className = 'nav-sep';
+        sep.textContent = '→';
+        topNav.appendChild(sep);
+      }
+      const b = document.createElement('button');
+      b.className = 'nav-badge' + (idx === 0 ? ' active' : '');
+      b.innerHTML = `<span class="num">${idx + 1}</span><span>${s.storyLabel}</span>`;
+      b.onclick = () => goToSlide(idx, { forceSpeak: voiceToggle.checked });
+      topNav.appendChild(b);
+      storyNavBadges.push(b);
+
+      const slide = document.createElement('div');
+      slide.className = 'slide-view' + (idx === 0 ? ' active' : '');
+      slide.innerHTML = `
+        <div class="slide-tag-line" style="color: ${s.tagColor}">${s.icon} ${s.tag}</div>
+        <h1 class="slide-title">${s.title}</h1>
+        <div class="slide-desc">${s.desc}</div>
+        <div class="callout-box ${s.calloutClass}">${s.callout}</div>
+      `;
+      deckScroll.appendChild(slide);
+      slideViews.push(slide);
+    });
+
+    updateUI();
+  }
+
+  function goToSlide(index, options = {}) {
+    if (index < 0 || index >= slidesData.length) return;
+    currentSlide = index;
+    // Cinematic dissolve: snap the overlay opaque to hide the hard scene swap,
+    // then fade it out to reveal the new scene.
+    if (stageFade) {
+      stageFade.style.transition = 'none';
+      stageFade.style.opacity = '1';
+    }
+    initScene(index);
+    updateUI();
+    updatePresenterWindow(index);
+    if (stageFade) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        stageFade.style.transition = 'opacity 0.45s ease';
+        stageFade.style.opacity = '0';
+      }));
+    }
+
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = false;
+    btnPlay.textContent = '▶ Играть';
+    progressBar.style.width = '0%';
+
+    const shouldSpeak = voiceToggle.checked && options.forceSpeak;
+    if (shouldSpeak) {
+      speakSlide(index);
+    } else {
+      prefetch(index);
+      prefetch(index + 1);
+    }
+  }
+
+  function updateUI() {
+    btnPrev.disabled = currentSlide === 0;
+    btnNext.disabled = currentSlide === slidesData.length - 1;
+    slideCounter.textContent = `${currentSlide + 1} / ${slidesData.length}`;
+    captionText.textContent = slidesData[currentSlide].caption;
+    if (sceneNote) sceneNote.textContent = slidesData[currentSlide].sceneNote || '';
+    updateLegend(currentSlide);
+
+    slideViews.forEach((v, i) => v.classList.toggle('active', i === currentSlide));
+    storyNavBadges.forEach((b, i) => b.classList.toggle('active', i === currentSlide));
+
+    const activeBadge = storyNavBadges[currentSlide];
+    if (activeBadge) {
+      activeBadge.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUDIO & TTS INTEGRATION (OFF BY DEFAULT AT START)
+  // ═══════════════════════════════════════════════════════════════════════════
+  let isPlaying = false;
+  let ttsAudio = null;
+  const preloadPool = {};
+  const NARRATION_VERSION = 'chamv2-12-20260825-v3';
+
+  voiceToggle.checked = false;
+
+  function ttsUrl(idx) {
+    const voice = localStorage.getItem('presentationVoiceChoice') || '';
+    return `narration/cham_v2/${__voiceSlug(voice)}/${idx}.mp3?v=${NARRATION_VERSION}`;
+  }
+
+  function prefetch(idx) {
+    if (idx < 0 || idx >= slidesData.length || preloadPool[idx]) return;
+    const a = new Audio(ttsUrl(idx));
+    a.preload = 'auto';
+    preloadPool[idx] = a;
+  }
+
+  function speakSlide(idx) {
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = true;
+    btnPlay.textContent = '⏸ Пауза';
+
+    const audio = preloadPool[idx] || new Audio(ttsUrl(idx));
+    delete preloadPool[idx];
+    audio.preload = 'auto';
+    ttsAudio = audio;
+
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration) {
+        progressBar.style.width = ((audio.currentTime / audio.duration) * 100) + '%';
+      }
+    });
+
+    audio.addEventListener('ended', () => {
+      isPlaying = false;
+      btnPlay.textContent = '▶ Играть';
+      progressBar.style.width = '0%';
+      if (currentSlide < slidesData.length - 1) {
+        goToSlide(currentSlide + 1, { forceSpeak: true });
+      }
+    });
+
+    audio.play().catch(() => {
+      isPlaying = false;
+      btnPlay.textContent = '▶ Играть';
+    });
+
+    prefetch(idx + 1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FULL PRESENTER WINDOW WITH CONTROLS & LIVE TTS TEXT SYNC
+  // ═══════════════════════════════════════════════════════════════════════════
+  let presenterWindow = null;
+  let presenterRenderToken = 0;
+
+  function getPresenterDoc() {
+    return (presenterWindow && !presenterWindow.closed) ? presenterWindow.document : null;
+  }
+
+  function formatNarrationHtml(text) {
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sentences = (text.match(/[^.!?…]+[.!?…]+["»)]*\s*/g) || [text]).map(s => s.trim()).filter(Boolean);
+    const paras = [];
+    for (let i = 0; i < sentences.length; i += 2) {
+      paras.push(sentences.slice(i, i + 2).join(' '));
+    }
+    return paras.map(p => '<p>' + esc(p) + '</p>').join('') || esc(text);
+  }
+
+  function renderPresenter(index) {
+    const doc = getPresenterDoc();
+    if (!doc) return;
+    const d = slidesData[index];
+    const token = ++presenterRenderToken;
+
+    const dotsHtml = slidesData.map((s, i) =>
+      `<button class="p-dot${i === index ? ' active' : ''}" data-slide="${i}" style="--p-dot:${s.tagColor}"></button>`
+    ).join('');
+
+    doc.body.innerHTML = `
+      <header>
+        <div>
+          <div class="eyebrow">🖥 Пульт докладчика · CHAM</div>
+          <div class="counter">Слайд ${index + 1} из ${slidesData.length}</div>
+        </div>
+        <button id="closeBtn" class="close" title="Закрыть пульт">✕</button>
+      </header>
+      <main class="notes">
+        <div class="pane-label">Точный текст озвучки &amp; Тезисы</div>
+        <div class="pv-tag" style="color:${d.tagColor}">${d.icon} ${d.tag}</div>
+        <h2>${d.title}</h2>
+        <div id="narrContent" class="pv-text">Загрузка текста озвучки…</div>
+        <div class="pv-callout">${d.callout}</div>
+        ${PRESENTER_TIPS[index] ? `<div class="pv-tip"><span class="pv-tip-label">🎛 Что на сцене</span>${PRESENTER_TIPS[index]}</div>` : ''}
+      </main>
+      <footer>
+        <button id="pPrevBtn" class="p-nav-btn" ${index === 0 ? 'disabled' : ''}>‹</button>
+        <div class="dots-wrap">${dotsHtml}</div>
+        <button id="pNextBtn" class="p-nav-btn" ${index === slidesData.length - 1 ? 'disabled' : ''}>›</button>
+      </footer>
+    `;
+
+    doc.getElementById('closeBtn').onclick = () => presenterWindow.close();
+    doc.getElementById('pPrevBtn').onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+    doc.getElementById('pNextBtn').onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+
+    doc.querySelectorAll('[data-slide]').forEach(b => {
+      b.onclick = () => goToSlide(Number(b.dataset.slide), { forceSpeak: voiceToggle.checked });
+    });
+
+    fetch(`narration/cham_v2/${index}.json`)
+      .then(r => { if (!r.ok) throw new Error('error'); return r.json(); })
+      .then(p => {
+        if (token !== presenterRenderToken) return;
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = formatNarrationHtml(p.text);
+      })
+      .catch(() => {
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = `<p>${d.desc}</p>`;
+      });
+  }
+
+  function updatePresenterWindow(index) {
+    if (getPresenterDoc()) renderPresenter(index);
+  }
+
+  async function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) {
+      presenterWindow.focus();
+      renderPresenter(currentSlide);
+      return;
+    }
+
+    if ('documentPictureInPicture' in window) {
+      try {
+        presenterWindow = await documentPictureInPicture.requestWindow({
+          width: Math.max(380, Math.min(540, Math.round(screen.availWidth * 0.26))),
+          height: Math.max(540, Math.round(screen.availHeight * 0.88)),
+          disallowReturnToOpener: true
+        });
+      } catch (e) {
+        presenterWindow = null;
+      }
+    }
+
+    if (!presenterWindow) {
+      presenterWindow = window.open('', 'cham-presenter-v2', 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
+    }
+
+    if (!presenterWindow) {
+      alert('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для пульта.');
+      return;
+    }
+
+    presenterWindow.document.write(`<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Пульт докладчика — CHAM</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: #0a0716; color: #cabfe0; font-family: 'Inter', -apple-system, sans-serif; }
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #120c22; border-bottom: 1px solid rgba(168,85,247,.25); z-index: 10; }
+    .eyebrow { color: #a855f7; font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .counter { margin-top: 4px; color: #8c7fab; font-size: 11px; font-weight: 700; }
+    .close { width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.1); background: #1a1130; color: #b3a5d0; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    .close:hover { background: rgba(168,85,247,.25); color: #fff; }
+    .notes { flex: 1; padding: 24px 22px 90px; overflow-y: auto; }
+    .pane-label { margin-bottom: 16px; color: #6f6394; font-size: 10px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    .pv-tag { font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    h2 { margin: 10px 0 18px; color: #f2eefb; font-size: 24px; line-height: 1.2; font-weight: 800; }
+    .pv-text { font-size: 16px; line-height: 1.65; color: #ded4f2; }
+    .pv-text p { margin-bottom: 14px; }
+    .pv-text p:first-child { font-weight: 600; color: #f5f0ff; }
+    .pv-callout { margin-top: 18px; padding: 14px 16px; border-radius: 10px; background: rgba(168,85,247,.1); border-left: 4px solid #a855f7; color: #d8caf0; font-size: 14px; line-height: 1.5; }
+    .pv-tip { margin-top: 14px; padding: 13px 15px; border-radius: 10px; background: rgba(34,211,238,.08); border: 1px dashed rgba(34,211,238,.4); color: #bfe9f2; font-size: 13.5px; line-height: 1.55; }
+    .pv-tip b { color: #eafaff; font-weight: 700; }
+    .pv-tip-label { display: block; margin-bottom: 6px; color: #22d3ee; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #120c22; border-top: 1px solid rgba(168,85,247,.25); z-index: 10; }
+    .p-nav-btn { width: 36px; height: 36px; font-size: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,.1); background: #1a1130; color: #b3a5d0; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .p-nav-btn:hover:not(:disabled) { border-color: #a855f7; color: #fff; background: rgba(168,85,247,.2); }
+    .p-nav-btn:disabled { opacity: .25; cursor: default; }
+    .dots-wrap { flex: 1; display: flex; justify-content: center; gap: 6px; }
+    .p-dot { width: 8px; height: 8px; border-radius: 50%; border: 0; background: #3a2f52; cursor: pointer; transition: all 0.2s; }
+    .p-dot.active { width: 22px; border-radius: 4px; background: var(--p-dot); box-shadow: 0 0 10px var(--p-dot); }
+  </style>
+</head>
+<body></body>
+</html>`);
+    presenterWindow.document.close();
+
+    presenterWindow.addEventListener('pagehide', () => {
+      btnPresenter.textContent = '🖥 Пульт';
+    });
+    btnPresenter.textContent = '🖥 Пульт открыт';
+
+    renderPresenter(currentSlide);
+    presenterWindow.focus();
+  }
+
+  // ── Event Listeners ──
+  btnPrev.onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+  btnNext.onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+  btnRestart.onclick = () => goToSlide(0, { forceSpeak: voiceToggle.checked });
+  btnPresenter.onclick = openPresenter;
+
+  btnPlay.onclick = () => {
+    if (isPlaying && ttsAudio) {
+      ttsAudio.pause();
+      isPlaying = false;
+      btnPlay.textContent = '▶ Играть';
+    } else if (!isPlaying && ttsAudio) {
+      ttsAudio.play();
+      isPlaying = true;
+      btnPlay.textContent = '⏸ Пауза';
+    } else {
+      speakSlide(currentSlide);
+    }
+  };
+
+  voiceToggle.addEventListener('change', () => {
+    if (!voiceToggle.checked && ttsAudio) {
+      ttsAudio.pause();
+      ttsAudio = null;
+      isPlaying = false;
+      btnPlay.textContent = '▶ Играть';
+      progressBar.style.width = '0%';
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); btnNext.click(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); btnPrev.click(); }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); openPresenter(); }
+  });
+
+  // ── Bootstrapping (Silent start) ──
+  resizeCanvas();
+  buildUI();
+  const hashSlide = parseInt((location.hash || '').replace('#', ''), 10);
+  const startIndex = Number.isInteger(hashSlide) && hashSlide >= 1 && hashSlide <= slidesData.length ? hashSlide - 1 : 0;
+  currentSlide = startIndex;
+  initScene(startIndex);
+  updateUI();
+  prefetch(startIndex);
+  prefetch(startIndex + 1);
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

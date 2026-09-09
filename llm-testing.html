@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM в тестировании · harness и разбор падений автотестов</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #04070a; }
+
+    /* console-deck shell (shared with router-cve/cham); cyan primary + violet LLM accent */
+    #cham-app {
+      --bg: #04070b;
+      --panel: #0a1018;
+      --panel-glass: rgba(10, 16, 24, 0.75);
+      --border: rgba(34, 211, 238, 0.22);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --text: #eaf6fb;
+      --muted: #8fa3b3;
+      --violet: #a855f7;
+      --violet-glow: rgba(168, 85, 247, 0.45);
+      --magenta: #ec4899;
+      --cyan: #22d3ee;
+      --cyan-glow: rgba(34, 211, 238, 0.4);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.4);
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      --red: #ef4444;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Top Story Navigator ── */
+    .top-nav {
+      flex-shrink: 0;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, #071820 0%, #04070b 100%);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
+      z-index: 10;
+    }
+    .top-nav::-webkit-scrollbar { height: 3px; }
+    .top-nav::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 3px; }
+
+    .nav-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-badge:hover {
+      color: #fff;
+      border-color: var(--cyan);
+      background: rgba(34, 211, 238, 0.12);
+      transform: translateY(-1px);
+    }
+    .nav-badge.active {
+      color: #04141a;
+      background: linear-gradient(135deg, #67e8f9, #22d3ee);
+      border-color: #67e8f9;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+    .nav-badge .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.25);
+      color: inherit;
+      font-size: 0.62rem;
+      font-weight: 800;
+    }
+    .nav-sep { color: rgba(34, 211, 238, 0.35); font-size: 0.75rem; flex-shrink: 0; }
+
+    /* ── Main Layout ── */
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* ── Left Narrative Deck ── */
+    .deck-panel {
+      width: 480px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg, #071620 0%, #04070b 100%);
+      z-index: 5;
+      box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.02em;
+    }
+    .brand-title span { color: var(--violet); }
+    .brand-subtitle { font-size: 0.7rem; color: var(--muted); font-weight: 500; margin-top: 2px; }
+
+    .btn-presenter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(34, 211, 238, 0.08);
+      color: var(--cyan);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-presenter:hover {
+      background: rgba(34, 211, 238, 0.22);
+      border-color: #67e8f9;
+      color: #fff;
+    }
+
+    .deck-scroll {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 28px 32px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .deck-scroll::-webkit-scrollbar { width: 4px; }
+    .deck-scroll::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.25); border-radius: 2px; }
+
+    .slide-view { display: none; animation: slideFade 0.35s ease-out; }
+    .slide-view.active { display: block; }
+    @keyframes slideFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .slide-tag-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .slide-tag-line::before {
+      content: '';
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .slide-title {
+      font-size: 1.85rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.18;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+
+    .slide-desc {
+      font-size: 1.02rem;
+      line-height: 1.68;
+      color: #cddbe4;
+      margin-bottom: 18px;
+    }
+    .slide-desc strong { color: #fff; font-weight: 700; }
+    .slide-desc .hl-cyan { color: var(--cyan); font-weight: 700; }
+    .slide-desc .hl-violet { color: #c084fc; font-weight: 700; }
+    .slide-desc .hl-emerald { color: var(--emerald); font-weight: 700; }
+    .slide-desc .hl-amber { color: var(--amber); font-weight: 700; }
+    .slide-desc .hl-red { color: var(--red); font-weight: 700; }
+
+    .callout-box {
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(34, 211, 238, 0.08);
+      border: 1px solid rgba(34, 211, 238, 0.28);
+      border-left: 4px solid var(--cyan);
+      color: #c6e7ef;
+      font-size: 0.92rem;
+      line-height: 1.58;
+      margin-top: 14px;
+    }
+    .callout-box.emerald {
+      background: rgba(16, 185, 129, 0.07);
+      border-color: rgba(16, 185, 129, 0.28);
+      border-left-color: var(--emerald);
+      color: #a7e5ce;
+    }
+    .callout-box.cyan {
+      background: rgba(34, 211, 238, 0.07);
+      border-color: rgba(34, 211, 238, 0.28);
+      border-left-color: var(--cyan);
+      color: #b2eaf5;
+    }
+    .callout-box.violet {
+      background: rgba(168, 85, 247, 0.08);
+      border-color: rgba(168, 85, 247, 0.3);
+      border-left-color: var(--violet);
+      color: #ddc4fb;
+    }
+    .callout-box.amber {
+      background: rgba(245, 158, 11, 0.07);
+      border-color: rgba(245, 158, 11, 0.28);
+      border-left-color: var(--amber);
+      color: #ecd29b;
+    }
+    .callout-box.blue {
+      background: rgba(59, 130, 246, 0.07);
+      border-color: rgba(59, 130, 246, 0.28);
+      border-left-color: var(--blue);
+      color: #b9d6fc;
+    }
+    .callout-box.red {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.3);
+      border-left-color: var(--red);
+      color: #f6b9b9;
+    }
+    .callout-box b, .callout-box strong { color: #fff; }
+
+    .code-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(168, 85, 247, 0.14);
+      border: 1px solid rgba(168, 85, 247, 0.32);
+      color: #e2ccfb;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      font-weight: 700;
+    }
+
+    /* ── Bottom Deck Controls ── */
+    .deck-controls {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      gap: 8px;
+      flex-shrink: 0;
+      background: #061019;
+    }
+    .ctl-btn {
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .ctl-btn.icon-only { width: 34px; padding: 0; font-size: 15px; }
+    .ctl-btn.primary {
+      background: var(--cyan);
+      color: #04141a;
+      border: none;
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+    .ctl-btn.primary:hover:not(:disabled) { background: #67e8f9; color: #000; }
+    .ctl-btn.ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-light);
+      color: var(--muted);
+    }
+    .ctl-btn.ghost:hover:not(:disabled) {
+      border-color: var(--cyan);
+      color: #fff;
+      background: rgba(34, 211, 238, 0.1);
+    }
+    .ctl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .deck-progress {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 0 4px;
+    }
+    .deck-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--violet), var(--cyan));
+      transition: width 0.2s linear;
+    }
+
+    .slide-counter-badge {
+      font-size: 0.74rem;
+      font-weight: 800;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .voice-toggle-label {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .voice-toggle-label input { position: absolute; opacity: 0; pointer-events: none; }
+    .voice-toggle-label:hover { border-color: var(--cyan); }
+    .voice-toggle-label input:checked + .v-icon { color: var(--cyan); filter: drop-shadow(0 0 6px var(--cyan)); }
+    .v-icon { font-size: 15px; }
+
+    /* ── Right Stage: Interactive Physics & Graphics ── */
+    .stage-panel {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #stage-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Floating Canvas HUD Overlays */
+    .stage-hud-top {
+      position: absolute;
+      top: 18px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(6, 14, 20, 0.85);
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      backdrop-filter: blur(10px);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #dcefff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .hud-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: hudPulse 1.8s infinite;
+    }
+    @keyframes hudPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+
+    .hud-controls-group {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-action-btn {
+      padding: 7px 14px;
+      border-radius: 14px;
+      background: rgba(168, 85, 247, 0.18);
+      border: 1px solid rgba(168, 85, 247, 0.45);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
+    .hud-action-btn:hover {
+      background: var(--violet);
+      color: #fff;
+      box-shadow: 0 0 16px var(--violet-glow);
+      transform: translateY(-1px);
+    }
+
+    .stage-hud-bottom {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      width: max-content;
+      max-width: min(560px, 88%);
+    }
+    .stage-scene-note {
+      pointer-events: none;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #a9c2d1;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      max-width: 100%;
+    }
+    .stage-caption-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 22px;
+      border-radius: 30px;
+      background: rgba(5, 12, 18, 0.92);
+      border: 1px solid rgba(34, 211, 238, 0.45);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      color: #edf6fa;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .stage-caption-pill .cap-icon { color: var(--violet); font-size: 1rem; }
+
+    .interactive-dock {
+      position: absolute;
+      bottom: 106px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    .stage-legend {
+      position: absolute;
+      bottom: 20px;
+      left: 24px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(5, 12, 18, 0.82);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      pointer-events: none;
+      max-width: 250px;
+    }
+    .stage-legend .legend-title {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .stage-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #e0eef5;
+      line-height: 1.2;
+    }
+    .stage-legend .legend-dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .stage-fade {
+      position: absolute;
+      inset: 0;
+      z-index: 9;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+    }
+  </style>
+</head>
+<body>
+
+<div id="cham-app">
+  <nav class="top-nav" id="top-nav" aria-label="Путь презентации"></nav>
+
+  <div class="main-workspace">
+
+    <aside class="deck-panel">
+      <div class="brand-header">
+        <div>
+          <div class="brand-title">🧪 LLM в <span>тестировании</span></div>
+          <div class="brand-subtitle">harness · разбор падений автотестов · по мотивам митапа YooMoney «Bugs Busters»</div>
+        </div>
+        <button class="btn-presenter" id="btn-presenter" title="Открыть пульт докладчика">🖥 Пульт</button>
+      </div>
+
+      <div class="deck-scroll" id="deck-scroll"></div>
+
+      <div class="deck-controls">
+        <button id="btn-prev" class="ctl-btn ghost icon-only" aria-label="Назад" disabled>‹</button>
+        <button id="btn-play" class="ctl-btn primary">▶ Играть</button>
+        <button id="btn-restart" class="ctl-btn ghost icon-only" title="В начало">↺</button>
+        <div class="deck-progress"><div class="deck-progress-fill" id="progress-bar"></div></div>
+        <span class="slide-counter-badge" id="slide-counter">1 / 10</span>
+        <label class="voice-toggle-label" title="Озвучка (TTS)" aria-label="Голос">
+          <input type="checkbox" id="voice-toggle">
+          <span class="v-icon">🗣️</span>
+        </label>
+        <select id="vpick-select" title="Голос докладчика" aria-label="Голос докладчика" style="height:32px;border:1px solid #30363d;border-radius:7px;background:#0d1117;color:#c9d1d9;padding:0 8px;font:inherit;font-size:.8rem;cursor:pointer;max-width:160px;">
+          <option value="edge:ru-RU-DmitryNeural">🤖 Стандартный</option>
+          <option value="elevenlabs:mine">🎙 Мой голос</option>
+        </select>
+        <script>window.__voiceSlug=function(v){v=String(v||'');return v.indexOf('elevenlabs')===0?'mine':'edge';};</script>
+<script>(function(){var K='presentationVoiceChoice',D='elevenlabs:mine',s=document.getElementById('vpick-select');var v=localStorage.getItem(K);if(!v){v=D;localStorage.setItem(K,D);}s.value=[].some.call(s.options,function(o){return o.value===v})?v:D;s.addEventListener('change',function(){localStorage.setItem(K,s.value||D);});})();</script>
+        <button id="btn-next" class="ctl-btn ghost">Далее ›</button>
+      </div>
+    </aside>
+
+    <main class="stage-panel">
+      <canvas id="stage-canvas"></canvas>
+      <div class="stage-fade" id="stage-fade"></div>
+      <div class="stage-legend" id="stage-legend"></div>
+
+      <div class="stage-hud-top">
+        <div class="hud-pill">
+          <span class="hud-dot" id="hud-status-dot"></span>
+          <span id="hud-status-text">LLM Testing Lab · 60 FPS</span>
+        </div>
+        <div class="hud-controls-group" id="hud-actions"></div>
+      </div>
+
+      <div class="interactive-dock" id="interactive-dock"></div>
+
+      <div class="stage-hud-bottom">
+        <div class="stage-caption-pill">
+          <span class="cap-icon">✦</span>
+          <span id="stage-caption-text">Инициализация…</span>
+        </div>
+        <div class="stage-scene-note" id="stage-scene-note"></div>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COLORS
+  // ═══════════════════════════════════════════════════════════════════════════
+  const CY = '#22d3ee', EM = '#10b981', RED = '#ef4444', AMB = '#f59e0b',
+        VIO = '#a855f7', BLUE = '#3b82f6', MAG = '#ec4899', MUT = '#64748b';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SLIDES DATA
+  // ═══════════════════════════════════════════════════════════════════════════
+  const slidesData = [
+    {
+      icon: '🧭', tag: 'Митап', tagColor: VIO, storyLabel: 'Два способа', mode: 'intro_bridge',
+      caption: 'LLM сам по себе — просто текст. Два способа приручить его в тестировании',
+      sceneNote: 'Слева — «сырая» LLM. Две ветки — обвязка и разбор падений — сходятся к надёжному QA.',
+      title: 'LLM в тестировании: два способа приручить',
+      desc: `<strong>LLM сам по себе — только генератор текста</strong>: он не запускает тесты, не помнит контекст и не проверяет себя. Чтобы он реально помогал в тестировании, вокруг него нужны две вещи: <span class="hl-cyan">обвязка</span> и <span class="hl-amber">разбор падений</span>.`,
+      callout: `<b>О чём дальше:</b> что это такое, зачем нужно и как это можно применить у нас — в тестировании Corezoid и simulator.`,
+      calloutClass: 'violet'
+    },
+    {
+      icon: '🔧', tag: 'Тема 1 · Harness', tagColor: CY, storyLabel: 'Что такое harness', mode: 'harness_anatomy',
+      caption: 'Harness = обвязка вокруг модели: инструменты, память, цикл, границы',
+      sceneNote: 'В центре — модель. Вокруг собирается обвязка: инструменты, память, цикл, границы.',
+      title: 'Harness — это обвязка вокруг модели',
+      desc: `Голая LLM только пишет текст: не помнит прошлое, не умеет ничего сделать сама, не проверяет себя. <strong>Harness</strong> — это <span class="hl-cyan">обвязка</span>: доступ к инструментам, память и контекст, цикл «подумал → сделал → посмотрел» и <span class="hl-amber">границы</span> — что вообще можно.`,
+      callout: `<b>Коротко:</b> модель — это мозг, а harness — руки, память и правила. Без обвязки «агента» не существует.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '🔁', tag: 'Тема 1 · Harness', tagColor: VIO, storyLabel: 'Зачем цикл', mode: 'agent_loop',
+      caption: 'Цикл агента: воспринял → спланировал → вызвал инструмент → увидел результат',
+      sceneNote: 'Токен идёт по кольцу: восприятие → план → инструмент → результат — и снова.',
+      title: 'Зачем агенту цикл, а не один ответ',
+      desc: `Без обвязки модель выдаёт один ответ и останавливается — даже если ошиблась. С harness это <strong>агент</strong>: <span class="hl-cyan">воспринял</span> лог или код → <span class="hl-violet">спланировал</span> → <span class="hl-amber">вызвал инструмент</span> → <span class="hl-emerald">увидел результат</span> — и повторяет, пока не решит задачу.`,
+      callout: `<b>Почему это важно для QA:</b> тестирование — это цикл проверок. Агент может сам запустить тест, прочитать вывод и попробовать снова.`,
+      calloutClass: 'violet'
+    },
+    {
+      icon: '🤖', tag: 'Тема 1 · Как мы', tagColor: EM, storyLabel: 'Harness у нас', mode: 'harness_ours',
+      caption: 'Агент-помощник по автотестам: читает наш мир свободно, действие — через подтверждение',
+      sceneNote: 'Агент читает наш QA-мир свободно (зелёное). Любое действие упирается в подтверждение ✋.',
+      title: 'Как мы можем: агент-помощник по автотестам',
+      desc: `Да — в первую очередь это про <strong>автотесты</strong>. Агент получает обвязку с доступом к <span class="hl-cyan">репозиторию автотестов, прогонам и логам CI</span>, к Jira и графу simulator. Работает <strong>как чат-помощник у инженера или бот в CI</strong>: читает и объясняет свободно, а запустить тест, обновить или создать тикет — <span class="hl-amber">только через подтверждение</span>.`,
+      callout: `<b>Насколько сложно:</b> средне — и заготовка уже есть. Наш скил <span class="code-badge">jira-qa</span> — это ровно такая обвязка (агент + Jira + правила). Остаётся добавить коннекторы к автотестам и CI. Рабочий MVP — недели, не месяцы.`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '🧱', tag: 'Тема 2 · Падения', tagColor: RED, storyLabel: 'Стена красных', mode: 'fail_wall',
+      caption: 'После прогона — стена красных тестов: где баг, где флаки, где инфра, где устарел?',
+      sceneNote: 'Часть красных — реальные баги, часть — флаки, часть — инфраструктура. Руками разбирать — часы.',
+      title: 'Проблема: стена упавших автотестов',
+      desc: `После большого прогона — десятки красных тестов. И не все они про баги: часть — <span class="hl-red">реальные дефекты</span>, часть — <span class="hl-amber">флаки</span> (мигают сами по себе), часть — <strong>инфраструктура и окружение</strong>, часть — просто <strong>устаревший тест</strong>.`,
+      callout: `<b>Боль:</b> разбирать это вручную — долго и скучно. Инженер тратит часы на триаж вместо реальных багов.`,
+      calloutClass: 'red'
+    },
+    {
+      icon: '🩺', tag: 'Тема 2 · Помощник', tagColor: VIO, storyLabel: 'Как разбирает', mode: 'triage_pipeline',
+      caption: 'Помощник: собирает контекст (лог + diff + история) → классифицирует причину → группирует',
+      sceneNote: 'Каждое падение обрастает контекстом, проходит классификатор и падает в свою корзину.',
+      title: 'AI-помощник для разбора падений',
+      desc: `Помощник берёт по каждому падению <strong>контекст</strong>: трассировку, лог, свежий <span class="code-badge">diff</span> и историю теста. Дальше <span class="hl-violet">классифицирует причину</span> — баг, флаки, инфра или устаревший тест — и группирует похожие падения вместе.`,
+      callout: `<b>Итог:</b> вместо «100 красных» инженер видит «4 причины» с готовым объяснением и подсказкой, что делать.`,
+      calloutClass: 'violet'
+    },
+    {
+      icon: '⚙️', tag: 'Тема 2 · Как мы', tagColor: AMB, storyLabel: 'Разбор у нас', mode: 'triage_ours',
+      caption: 'Вешаем помощника на наш CI: группирует падения, черновик в Jira, помечает флаки',
+      sceneNote: 'Помощник разбирает прогон, сводит к причинам и готовит черновик в Jira. Вердикт — за человеком.',
+      title: 'Как мы можем: разбор падений на CI',
+      desc: `Повесить помощника на наш CI: после прогона он <strong>сводит сотни красных к нескольким причинам</strong>, помечает флаки, готовит черновик тикета в <span class="hl-amber">Jira</span>. Человек только <span class="hl-emerald">подтверждает вердикт</span>.`,
+      callout: `<b>Честно:</b> помощник ошибается — вердикт предварительный, финал за инженером. И на нестандартном стеке (логи Erlang/BEAM) качество надо проверить на наших данных.`,
+      calloutClass: 'amber'
+    },
+    {
+      icon: '🎯', tag: 'Вывод', tagColor: EM, storyLabel: 'Вывод', mode: 'summary',
+      caption: 'Две темы — одна идея: LLM не «сам», а в обвязке и с разбором результатов',
+      sceneNote: 'Обвязка + разбор падений, и всегда человек на воротах — вот рабочая связка.',
+      title: 'Вывод: LLM в QA работает не «сам»',
+      desc: `Две темы — одна мысль. LLM в тестировании приносит пользу, только когда он <span class="hl-cyan">в обвязке</span> и с <span class="hl-amber">разбором результатов</span> — и всегда <strong>человек на воротах</strong>.`,
+      callout: `<b>Что попробовать у нас:</b> QA-агент с обвязкой и правами (у нас уже есть заготовка — скил <span class="code-badge">jira-qa</span>) · помощник-разборщик падений на CI. Начать стоит с малого — на своих данных.`,
+      calloutClass: 'emerald'
+    }
+  ];
+
+  // Пульт-only подсказки докладчику (не входят в озвучку).
+  const PRESENTER_TIPS = [
+    'Сцена: слева «сырая» LLM (фиолетовая) — просто текст. Две ветки — обвязка и разбор падений — сходятся к зелёному узлу «QA под контролем». Задай рамку доклада: два способа сделать LLM полезной в тестировании, и в конце — как применить у нас.',
+    'Кнопка <b>«🧩 Собрать обвязку»</b> собирает вокруг модели четыре части: инструменты, память/контекст, цикл, границы. Мысль для зала: сама модель — только мозг; harness — это руки, память и правила. Без обвязки слова «ИИ-агент» вообще нет.',
+    'Кнопка <b>«🔁 Прогнать цикл»</b> гоняет токен по кольцу: воспринял → спланировал → вызвал инструмент → увидел результат. Подчеркни: без цикла модель отвечает один раз и не может себя проверить; с циклом она сама запускает тест и читает вывод.',
+    'Кнопка <b>«✋ Создать тикет»</b>: агент читает наш мир (автотесты, CI-логи, Jira, граф simulator) свободно — зелёные потоки; любое действие упирается в ✋ и пишется в аудит. Проговори три вещи: (1) это в первую очередь про <b>автотесты</b>; (2) в каком виде — чат-помощник у инженера или бот в CI; (3) насколько сложно — <b>средне, заготовка уже есть</b>: наш скил <b>jira-qa</b> — это ровно такая обвязка (агент + Jira + правила), добавить надо коннекторы к автотестам и CI. MVP за недели.',
+    'Кнопка <b>«🔄 Прогнать тесты»</b> заново раскидывает стену тестов. Обрати внимание на счётчик: красных много, но это смесь — баги, флаки, инфра, устаревшие тесты. Именно поэтому ручной триаж дорогой.',
+    'Кнопка <b>«▶ Разобрать заново»</b> прогоняет конвейер: упавший тест обрастает контекстом (лог + diff + история), проходит классификатор и падает в одну из четырёх корзин. Внизу видно распределение: реальных багов обычно немного.',
+    'Кнопка <b>«▶ Разобрать прогон»</b>: помощник берёт прогон CI со ста падениями, сводит их к нескольким причинам и готовит черновик в Jira. Обязательно проговори честную часть: вердикт предварительный, финал за человеком, а на логах Erlang/BEAM качество надо проверить.',
+    'Финал: две карточки — обвязка и разбор падений — и бейдж «человек на воротах». Напомни: QA-агент с обвязкой у нас уже наполовину есть — это скил jira-qa. Заверши призывом: начать с малого на своих данных, а не внедрять всё сразу.'
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CANVAS ENGINE
+  // ═══════════════════════════════════════════════════════════════════════════
+  const canvas = document.getElementById('stage-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Projector readability: enlarge EVERY on-canvas label uniformly.
+  const FONT_SCALE = 1.35;
+  const _fontDesc = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'font');
+  Object.defineProperty(ctx, 'font', {
+    configurable: true,
+    get() { return _fontDesc.get.call(this); },
+    set(v) {
+      _fontDesc.set.call(this, String(v).replace(/(\d+(?:\.\d+)?)px/, (m, n) => (parseFloat(n) * FONT_SCALE).toFixed(1) + 'px'));
+    }
+  });
+
+  let width = 0, height = 0, dpr = 1;
+  function resizeCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    width = rect.width; height = rect.height;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.resetTransform && ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  let currentSlide = 0;
+  let animTime = 0;
+  let shockwaves = [];
+  let sparks = [];
+  let customState = {};
+
+  function addSparks(x, y, color, count = 16, maxSpeed = 5) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * maxSpeed;
+      sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 1.0, decay: 0.02 + Math.random() * 0.03, color, size: 2 + Math.random() * 3 });
+    }
+  }
+  function addShockwave(x, y, color, maxRadius = 80) {
+    shockwaves.push({ x, y, radius: 5, maxRadius, life: 1.0, decay: 0.03, color });
+  }
+
+  // ── Shared draw helpers ──
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function box(x, y, w, h, color, title, sub, opts) {
+    opts = opts || {};
+    ctx.save();
+    rr(x, y, w, h, opts.radius || 12);
+    ctx.fillStyle = opts.bg || 'rgba(8,16,24,0.88)';
+    ctx.fill();
+    ctx.lineWidth = opts.lw || 2;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color; ctx.shadowBlur = opts.glow != null ? opts.glow : 14;
+    ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (title) {
+      ctx.fillStyle = '#fff'; ctx.font = '700 15px Inter';
+      ctx.fillText(title, x + w / 2, y + h / 2 - (sub ? 9 : 0));
+    }
+    if (sub) { ctx.fillStyle = color; ctx.font = '700 12px JetBrains Mono'; ctx.fillText(sub, x + w / 2, y + h / 2 + 11); }
+    ctx.restore();
+  }
+  function line(x1, y1, x2, y2, color, w, dash) {
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = w || 2;
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.restore();
+  }
+  function flowDots(x1, y1, x2, y2, color, speed, count, size) {
+    for (let i = 0; i < count; i++) {
+      const t = ((animTime * speed + i / count) % 1);
+      const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
+      ctx.save();
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
+      ctx.globalAlpha = 0.35 + 0.5 * Math.sin(t * Math.PI);
+      ctx.beginPath(); ctx.arc(x, y, size || 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  function label(txt, x, y, color, size, weight, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = (weight || 700) + ' ' + (size || 13) + 'px Inter';
+    ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+  function mono(txt, x, y, color, size, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = '700 ' + (size || 13) + 'px JetBrains Mono';
+    ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+  // horizontal progress/score bar
+  function bar(x, y, w, h, frac, color) {
+    ctx.save();
+    rr(x, y, w, h, h / 2); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
+    if (frac > 0) {
+      rr(x, y, Math.max(h, w * Math.min(1, frac)), h, h / 2);
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCENE INITIALIZATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  function buildFailCells() {
+    const cols = 10, rows = 5;
+    const cells = [];
+    // weighted: pass 0.55, fail(bug) 0.28, flaky 0.17
+    for (let i = 0; i < cols * rows; i++) {
+      const r = Math.random();
+      const st = r < 0.55 ? 'pass' : (r < 0.83 ? 'fail' : 'flaky');
+      cells.push({ st, born: Math.random() * 0.6 });
+    }
+    customState.cells = cells; customState.cols = cols; customState.rows = rows; customState.wallT = 0;
+  }
+
+  function initScene(slideIndex) {
+    shockwaves = []; sparks = []; customState = {};
+    const mode = slidesData[slideIndex].mode;
+
+    if (mode === 'harness_anatomy') {
+      customState.asm = 0;
+    } else if (mode === 'agent_loop') {
+      customState.loopT = 0;
+    } else if (mode === 'harness_ours') {
+      customState.writeTry = 0; customState.audit = [];
+    } else if (mode === 'fail_wall') {
+      buildFailCells();
+    } else if (mode === 'triage_pipeline') {
+      customState.pipeT = 0; customState.pickIdx = 0;
+      customState.buckets = { bug: 0, flaky: 0, infra: 0, stale: 0 };
+      // fixed sequence: mostly infra/flaky, few real bugs
+      customState.seq = ['infra','flaky','infra','stale','flaky','bug','infra','flaky','infra','stale','flaky','bug'];
+    } else if (mode === 'triage_ours') {
+      customState.flowT = 0;
+    } else if (mode === 'judge_arena') {
+      customState.judgeT = 0;
+    } else if (mode === 'judge_ours') {
+      customState.rankT = 0;
+    }
+
+    renderHUDControls(slideIndex);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HUD CONTROLS
+  // ═══════════════════════════════════════════════════════════════════════════
+  function renderHUDControls(slideIndex) {
+    const hudGroup = document.getElementById('hud-actions');
+    const dockGroup = document.getElementById('interactive-dock');
+    hudGroup.innerHTML = ''; dockGroup.innerHTML = '';
+    const mode = slidesData[slideIndex].mode;
+
+    const hudBtn = (html, onclick) => {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn'; b.innerHTML = html; b.onclick = onclick;
+      hudGroup.appendChild(b);
+    };
+
+    if (mode === 'harness_anatomy') {
+      hudBtn('🧩 Собрать обвязку', () => { customState.asm = 0; });
+    } else if (mode === 'agent_loop') {
+      hudBtn('🔁 Прогнать цикл', () => { customState.loopT = 0; });
+    } else if (mode === 'harness_ours') {
+      hudBtn('✋ Создать тикет', () => {
+        customState.writeTry = 1.0;
+        customState.audit.unshift('write → Jira · создать тикет · ждёт ✋');
+        customState.audit = customState.audit.slice(0, 4);
+      });
+    } else if (mode === 'fail_wall') {
+      hudBtn('🔄 Прогнать тесты', () => { buildFailCells(); });
+    } else if (mode === 'triage_pipeline') {
+      hudBtn('▶ Разобрать заново', () => {
+        customState.pipeT = 0; customState.pickIdx = 0;
+        customState.buckets = { bug: 0, flaky: 0, infra: 0, stale: 0 };
+      });
+    } else if (mode === 'triage_ours') {
+      hudBtn('▶ Разобрать прогон', () => { customState.flowT = 0; });
+    } else if (mode === 'judge_arena') {
+      hudBtn('⚖️ Судить', () => { customState.judgeT = 0; });
+    } else if (mode === 'judge_ours') {
+      hudBtn('📊 Пересчитать', () => { customState.rankT = 0; });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN LOOP
+  // ═══════════════════════════════════════════════════════════════════════════
+  function animate() {
+    requestAnimationFrame(animate);
+    animTime += 0.016;
+    ctx.clearRect(0, 0, width, height);
+    drawBackgroundGrid();
+
+    const mode = slidesData[currentSlide].mode;
+    if (mode === 'intro_bridge') renderIntroBridge();
+    else if (mode === 'harness_anatomy') renderHarnessAnatomy();
+    else if (mode === 'agent_loop') renderAgentLoop();
+    else if (mode === 'harness_ours') renderHarnessOurs();
+    else if (mode === 'fail_wall') renderFailWall();
+    else if (mode === 'triage_pipeline') renderTriagePipeline();
+    else if (mode === 'triage_ours') renderTriageOurs();
+    else if (mode === 'judge_arena') renderJudgeArena();
+    else if (mode === 'judge_ours') renderJudgeOurs();
+    else if (mode === 'summary') renderSummary();
+
+    renderEffects();
+  }
+
+  function drawBackgroundGrid() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.05)';
+    ctx.lineWidth = 1;
+    const step = 44;
+    for (let x = 0; x < width; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+    for (let y = 0; y < height; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // ── Scene 1: intro bridge ──
+  function renderIntroBridge() {
+    const llm = { x: width * 0.13, y: height * 0.5 };
+    const tx = width * 0.5;
+    const target = { x: width * 0.87, y: height * 0.5 };
+    const themes = [
+      { icon: '🔧', t: 'Обвязка (harness)', color: CY,  y: height * 0.32 },
+      { icon: '🩺', t: 'Разбор падений', color: AMB, y: height * 0.68 }
+    ];
+
+    themes.forEach(th => {
+      line(llm.x + 58, llm.y, tx - 122, th.y, 'rgba(168,85,247,0.28)', 2, [6, 6]);
+      flowDots(llm.x + 58, llm.y, tx - 122, th.y, th.color, 0.4, 3, 3);
+      line(tx + 122, th.y, target.x - 54, target.y, 'rgba(16,185,129,0.28)', 2);
+      flowDots(tx + 122, th.y, target.x - 54, target.y, th.color, 0.5, 2, 3);
+    });
+
+    // raw LLM source
+    box(llm.x - 58, llm.y - 42, 116, 84, VIO, '', '', { glow: 18 });
+    label('🧠', llm.x, llm.y - 10, '#fff', 26);
+    label('LLM', llm.x, llm.y + 18, VIO, 13, 800);
+    label('просто текст', llm.x, llm.y + 60, MUT, 12, 700);
+
+    // theme cards
+    themes.forEach(th => {
+      box(tx - 122, th.y - 30, 244, 60, th.color, '', '', { glow: 12 });
+      label(th.icon, tx - 92, th.y, th.color, 20);
+      label(th.t, tx + 14, th.y, '#fff', 15, 800);
+    });
+
+    // target
+    ctx.save(); ctx.fillStyle = 'rgba(16,185,129,0.08)'; ctx.beginPath(); ctx.arc(target.x, target.y, 60, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    box(target.x - 54, target.y - 46, 108, 92, EM, '', '', { glow: 18 });
+    label('✅', target.x, target.y - 12, '#fff', 26);
+    label('QA под', target.x, target.y + 14, EM, 12, 800);
+    label('контролем', target.x, target.y + 30, EM, 12, 800);
+
+    label('Два способа приручить LLM в тестировании', width / 2, height * 0.08, VIO, 14, 800);
+  }
+
+  // ── Scene 2: harness anatomy ──
+  function renderHarnessAnatomy() {
+    const cx = width * 0.45, cy = height * 0.52;
+    customState.asm = Math.min(1, (customState.asm || 0) + 0.006);
+    const a = customState.asm;
+
+    if (a > 0.05) {
+      ctx.save(); ctx.globalAlpha = Math.min(0.45, a); ctx.strokeStyle = CY; ctx.lineWidth = 2;
+      ctx.setLineDash([6, 9]);
+      ctx.beginPath(); ctx.arc(cx, cy, 158, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+
+    const parts = [
+      { icon: '🔧', txt: 'Инструменты', color: CY },
+      { icon: '🧠', txt: 'Память · контекст', color: BLUE },
+      { icon: '🔁', txt: 'Цикл действий', color: EM },
+      { icon: '🚧', txt: 'Границы прав', color: AMB }
+    ];
+    parts.forEach((p, i) => {
+      if (a < 0.08) return;
+      const ang = -Math.PI / 2 + (i / parts.length) * Math.PI * 2;
+      const rad = 158;
+      const fx = cx + Math.cos(ang) * rad * a;
+      const fy = cy + Math.sin(ang) * rad * 0.82 * a;
+      line(cx, cy, fx, fy, 'rgba(148,163,184,0.18)', 1, [4, 4]);
+      box(fx - 108, fy - 21, 216, 42, p.color, '', '', { glow: 10 });
+      label(p.icon, fx - 84, fy, p.color, 16);
+      label(p.txt, fx + 12, fy, '#fff', 12.5, 800);
+    });
+
+    // core model
+    ctx.save(); ctx.fillStyle = 'rgba(168,85,247,0.10)'; ctx.beginPath(); ctx.arc(cx, cy, 58, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    box(cx - 48, cy - 42, 96, 84, VIO, '', '', { glow: 20 });
+    label('🧠', cx, cy - 10, '#fff', 28);
+    label('LLM', cx, cy + 20, VIO, 12, 800);
+
+    if (a < 0.99) label('без обвязки LLM только пишет текст…', width / 2, height * 0.09, MUT, 13, 800);
+    else label('…с обвязкой — это агент, который действует', width / 2, height * 0.09, EM, 14, 800);
+  }
+
+  // ── Scene 3: agent loop ──
+  function renderAgentLoop() {
+    const cx = width * 0.46, cy = height * 0.52, R = Math.min(width, height) * 0.25;
+    const steps = [
+      { icon: '👁', t: 'Воспринял', s: 'лог / код', color: CY },
+      { icon: '🧭', t: 'Спланировал', s: 'что сделать', color: VIO },
+      { icon: '🛠', t: 'Вызвал инструмент', s: 'run / read', color: AMB },
+      { icon: '📊', t: 'Увидел результат', s: 'вывод', color: EM }
+    ];
+    customState.loopT = (customState.loopT || 0) + 0.0035;
+    const t = customState.loopT;
+    const active = Math.floor(t * 4) % 4;
+
+    ctx.save(); ctx.strokeStyle = 'rgba(148,163,184,0.22)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+
+    const pos = steps.map((s, i) => {
+      const ang = -Math.PI / 2 + i / 4 * Math.PI * 2;
+      return { x: cx + Math.cos(ang) * R, y: cy + Math.sin(ang) * R };
+    });
+
+    steps.forEach((s, i) => {
+      const on = i === active;
+      box(pos[i].x - 74, pos[i].y - 36, 148, 72, on ? s.color : '#334155', '', '', { glow: on ? 16 : 5 });
+      label(s.icon, pos[i].x, pos[i].y - 12, '#fff', 22);
+      label(s.t, pos[i].x, pos[i].y + 11, on ? s.color : '#9fb2bf', 11.5, 800);
+      label(s.s, pos[i].x, pos[i].y + 28, on ? '#fff' : '#7f97a6', 9.5, 700);
+    });
+
+    // traveling token along circle
+    const tk = (t % 1);
+    const tkAng = -Math.PI / 2 + tk * Math.PI * 2;
+    const tox = cx + Math.cos(tkAng) * R, toy = cy + Math.sin(tkAng) * R;
+    ctx.save(); ctx.fillStyle = '#fff'; ctx.shadowColor = CY; ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.arc(tox, toy, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+
+    // center
+    label('🔁', cx, cy - 12, VIO, 24);
+    label('agent loop', cx, cy + 12, VIO, 12, 800);
+    label('итерация ' + (Math.floor(t) + 1), cx, cy + 32, EM, 11, 800);
+
+    label('без цикла LLM ответил бы один раз — и остановился', width / 2, height * 0.09, MUT, 12, 700);
+  }
+
+  // ── Scene 4: harness ours ──
+  function renderHarnessOurs() {
+    const cx = width * 0.44, cy = height * 0.5;
+    const tools = [
+      { icon: '📁', t: 'Автотесты',      color: CY,   x: width * 0.72, y: height * 0.22 },
+      { icon: '📊', t: 'CI-логи',        color: EM,   x: width * 0.80, y: height * 0.50 },
+      { icon: '🎫', t: 'Jira',           color: AMB,  x: width * 0.72, y: height * 0.78 },
+      { icon: '🕸', t: 'Граф simulator', color: BLUE, x: width * 0.46, y: height * 0.83 }
+    ];
+
+    tools.forEach(tl => {
+      line(cx + 50, cy, tl.x, tl.y, 'rgba(16,185,129,0.28)', 2);
+      flowDots(cx + 50, cy, tl.x, tl.y, EM, 0.4, 2, 3);
+    });
+
+    // write attempt to Jira (create ticket) → blocked at ✋
+    if (customState.writeTry > 0) {
+      customState.writeTry -= 0.01;
+      const jira = tools[2];
+      const gx = (cx + 50 + jira.x) / 2, gy = (cy + jira.y) / 2;
+      const tt = Math.min(1, (1 - customState.writeTry) * 2);
+      const px = cx + 50 + (gx - (cx + 50)) * Math.min(tt, 1);
+      const py = cy + (gy - cy) * Math.min(tt, 1);
+      ctx.save(); ctx.fillStyle = AMB; ctx.shadowColor = AMB; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      label('✋', gx, gy, RED, 24);
+      label('нужно подтверждение', gx, gy + 24, RED, 11, 800);
+      if (tt >= 1 && !customState._wp) { addShockwave(gx, gy, RED, 55); customState._wp = true; }
+      if (customState.writeTry <= 0) customState._wp = false;
+    }
+
+    // agent
+    ctx.save(); ctx.fillStyle = 'rgba(168,85,247,0.10)'; ctx.beginPath(); ctx.arc(cx, cy, 56, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    box(cx - 50, cy - 40, 100, 80, VIO, '', '', { glow: 20 });
+    label('🤖', cx, cy - 8, '#fff', 26);
+    label('QA-агент', cx, cy + 18, VIO, 12, 800);
+
+    tools.forEach(tl => {
+      box(tl.x - 62, tl.y - 28, 124, 56, tl.color, '', '', { glow: 10 });
+      label(tl.icon, tl.x, tl.y - 6, '#fff', 20);
+      label(tl.t, tl.x, tl.y + 15, tl.color, 11.5, 800);
+    });
+
+    label('читает наш QA-мир свободно · действие — через ✋', width / 2, height * 0.09, EM, 13, 800);
+
+    // audit log (top-left of stage, under status pill)
+    const audit = customState.audit || [];
+    if (audit.length) {
+      const lx = width * 0.05, lyy = height * 0.16;
+      box(lx, lyy, width * 0.30, 24 + audit.length * 20, VIO, '', '', { glow: 8, bg: 'rgba(6,12,18,0.9)' });
+      label('📓 аудит', lx + 52, lyy + 14, VIO, 11, 800);
+      audit.forEach((a, i) => mono(a, lx + 14, lyy + 36 + i * 20, '#cdd8e0', 10.5, 'left'));
+    }
+  }
+
+  // ── Scene 5: fail wall ──
+  function renderFailWall() {
+    customState.wallT = Math.min(1, (customState.wallT || 0) + 0.02);
+    const cols = customState.cols, rows = customState.rows, cells = customState.cells;
+    const gx0 = width * 0.30, gx1 = width * 0.93, gy0 = height * 0.20, gy1 = height * 0.74;
+    const cw = (gx1 - gx0) / cols, chh = (gy1 - gy0) / rows;
+    const pad = Math.min(cw, chh) * 0.16;
+
+    let nPass = 0, nFail = 0, nFlaky = 0;
+    cells.forEach((c, i) => {
+      if (c.st === 'pass') nPass++; else if (c.st === 'fail') nFail++; else nFlaky++;
+      const col = i % cols, row = Math.floor(i / cols);
+      const x = gx0 + col * cw + pad, y = gy0 + row * chh + pad;
+      const w = cw - pad * 2, h = chh - pad * 2;
+      const appear = Math.max(0, Math.min(1, (customState.wallT - c.born) / 0.25));
+      if (appear <= 0) return;
+      const color = c.st === 'pass' ? EM : (c.st === 'fail' ? RED : AMB);
+      ctx.save();
+      ctx.globalAlpha = appear;
+      rr(x, y, w, h, 6);
+      ctx.fillStyle = c.st === 'pass' ? 'rgba(16,185,129,0.18)' : (c.st === 'fail' ? 'rgba(239,68,68,0.22)' : 'rgba(245,158,11,0.20)');
+      ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = color;
+      if (c.st !== 'pass') { ctx.shadowColor = color; ctx.shadowBlur = 8 + (c.st === 'flaky' ? 4 * Math.abs(Math.sin(animTime * 3 + i)) : 0); }
+      ctx.stroke();
+      ctx.restore();
+      const mark = c.st === 'pass' ? '✓' : (c.st === 'fail' ? '✕' : '~');
+      label(mark, x + w / 2, y + h / 2, color, 13, 800);
+    });
+
+    // counters
+    label('прогон автотестов', gx0 + (gx1 - gx0) / 2, height * 0.13, '#c6d5df', 13, 800);
+    const legendY = height * 0.83;
+    const items = [['✕ красных: ' + nFail, RED], ['~ флаки: ' + nFlaky, AMB], ['✓ прошло: ' + nPass, EM]];
+    const totalW = 560; let sx = width * 0.30 + ((gx1 - gx0) - totalW) / 2 + (gx1 - gx0) / 2 - (gx1 - gx0) / 2;
+    sx = gx0;
+    items.forEach((it, i) => {
+      const w = 185;
+      box(sx + i * w, legendY - 18, w - 12, 36, it[1], '', '', { glow: 8 });
+      label(it[0], sx + i * w + (w - 12) / 2, legendY, '#fff', 12.5, 800);
+    });
+  }
+
+  // ── Scene 6: triage pipeline ──
+  function renderTriagePipeline() {
+    const b = customState.buckets;
+    customState.pipeT += 0.009;
+    let landed = false;
+    if (customState.pipeT >= 1) {
+      const pick = customState.seq[customState.pickIdx % customState.seq.length];
+      b[pick]++; customState.pickIdx++;
+      customState.pipeT = 0; landed = true; customState.lastPick = pick;
+    }
+    const t = customState.pipeT;
+    const nextPick = customState.seq[customState.pickIdx % customState.seq.length];
+
+    const yMid = height * 0.44;
+    const testX = width * 0.11, ctxX = width * 0.33, clsX = width * 0.55, bkX = width * 0.80;
+
+    // spine
+    line(testX + 40, yMid, clsX, yMid, 'rgba(148,163,184,0.28)', 2);
+
+    // context box (gather)
+    box(ctxX - 78, yMid - 52, 156, 104, CY, '', '', { glow: 10, bg: 'rgba(5,14,20,0.95)' });
+    label('🧷 контекст', ctxX, yMid - 34, CY, 12, 800);
+    ['📄 лог', '🔀 diff', '🕓 история'].forEach((s, i) => label(s, ctxX, yMid - 10 + i * 22, '#cdd8e0', 11.5, 700));
+
+    // classifier prism
+    ctx.save();
+    ctx.translate(clsX, yMid);
+    ctx.rotate(Math.PI / 4);
+    box(-34, -34, 68, 68, VIO, '', '', { glow: 16 });
+    ctx.restore();
+    label('🧠', clsX, yMid - 4, '#fff', 20);
+    label('классификатор', clsX, yMid + 54, VIO, 11, 800);
+
+    // buckets
+    const buckets = [
+      { k: 'bug',   icon: '🐞', t: 'Баг',     color: RED,  y: height * 0.16 },
+      { k: 'flaky', icon: '🎲', t: 'Флаки',   color: AMB,  y: height * 0.36 },
+      { k: 'infra', icon: '🔧', t: 'Инфра',   color: BLUE, y: height * 0.56 },
+      { k: 'stale', icon: '🕰', t: 'Устарел', color: MAG,  y: height * 0.76 }
+    ];
+    buckets.forEach(bk => {
+      line(clsX + 24, yMid, bkX - 96, bk.y, 'rgba(148,163,184,0.18)', 1.5, [4, 4]);
+      const flash = (landed && customState.lastPick === bk.k);
+      box(bkX - 96, bk.y - 26, 192, 52, bk.color, '', '', { glow: flash ? 18 : 8 });
+      label(bk.icon, bkX - 70, bk.y, bk.color, 18);
+      label(bk.t, bkX - 30, bk.y, '#fff', 12.5, 800);
+      mono('×' + b[bk.k], bkX + 52, bk.y, bk.color, 15, 'left');
+      if (flash) addSparks(bkX - 96, bk.y, bk.color, 10, 3);
+    });
+
+    // failing test chip (source) + traveling token
+    const nextColor = { bug: RED, flaky: AMB, infra: BLUE, stale: MAG }[nextPick];
+    box(testX - 40, yMid - 24, 80, 48, RED, '', '', { glow: 12 });
+    label('❌', testX, yMid - 4, '#fff', 18);
+    label('тест', testX, yMid + 15, RED, 11, 800);
+
+    // token moves test → classifier, colored by nextPick after mid
+    const jx = testX + 40 + (clsX - (testX + 40)) * t;
+    const col = t > 0.5 ? nextColor : RED;
+    ctx.save(); ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(jx, yMid, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+
+    const total = b.bug + b.flaky + b.infra + b.stale;
+    label('разобрано падений: ' + total + ' · реальных багов немного', width / 2, height * 0.80, EM, 13, 800);
+  }
+
+  // ── Scene 7: triage ours ──
+  function renderTriageOurs() {
+    customState.flowT = Math.min(1, (customState.flowT || 0) + 0.006);
+    const t = customState.flowT;
+    const yMid = height * 0.46;
+
+    // CI run source (left)
+    const ciX = width * 0.13;
+    box(ciX - 66, yMid - 44, 132, 88, RED, '', '', { glow: 12, bg: 'rgba(14,6,8,0.9)' });
+    label('🧪 CI-прогон', ciX, yMid - 22, '#fff', 13, 800);
+    label('#1287', ciX, yMid + 2, MUT, 12, 700);
+    label('100 ❌', ciX, yMid + 24, RED, 15, 900);
+
+    // assistant (center)
+    const asX = width * 0.40;
+    line(ciX + 66, yMid, asX - 50, yMid, 'rgba(239,68,68,0.4)', 2);
+    if (t > 0.1) flowDots(ciX + 66, yMid, asX - 50, yMid, RED, 0.5, 3, 3);
+    ctx.save(); ctx.fillStyle = 'rgba(168,85,247,0.10)'; ctx.beginPath(); ctx.arc(asX, yMid, 52, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    box(asX - 48, yMid - 40, 96, 80, VIO, '', '', { glow: 18 });
+    label('🤖', asX, yMid - 8, '#fff', 24);
+    label('помощник', asX, yMid + 18, VIO, 11.5, 800);
+
+    // grouped verdict cards (right)
+    const cards = [
+      { icon: '🔧', t: 'Инфра', n: 48, color: BLUE, y: height * 0.18 },
+      { icon: '🎲', t: 'Флаки', n: 36, color: AMB,  y: height * 0.38 },
+      { icon: '🕰', t: 'Устарел', n: 15, color: MAG, y: height * 0.58 },
+      { icon: '🐞', t: 'Реальный баг', n: 1, color: RED, y: height * 0.78 }
+    ];
+    const cardX = width * 0.68;
+    cards.forEach((c, i) => {
+      const appear = Math.max(0, Math.min(1, (t - 0.25 - i * 0.12) / 0.3));
+      if (appear <= 0) return;
+      line(asX + 48, yMid, cardX - 8, c.y, 'rgba(148,163,184,0.2)', 1.5, [4, 4]);
+      ctx.save(); ctx.globalAlpha = appear;
+      box(cardX - 8, c.y - 26, 250, 52, c.color, '', '', { glow: 10 });
+      label(c.icon, cardX + 20, c.y, c.color, 18);
+      label(c.t, cardX + 118, c.y, '#fff', 13, 800);
+      mono('×' + c.n, cardX + 210, c.y, c.color, 15, 'left');
+      ctx.restore();
+    });
+
+    if (t >= 0.95) {
+      label('✋ вердикт подтверждает инженер → черновик в Jira', width / 2, height * 0.82, EM, 13, 800);
+    } else {
+      label('100 красных сводятся к 4 причинам', width / 2, height * 0.82, VIO, 13, 800);
+    }
+    label('было: 100 ручных разборов → стало: 4 группы', width / 2, height * 0.09, AMB, 13, 800);
+  }
+
+  // ── Scene 8: judge arena ──
+  function renderJudgeArena() {
+    customState.judgeT = Math.min(1, (customState.judgeT || 0) + 0.006);
+    const t = customState.judgeT;
+
+    // criteria + target scores (B wins)
+    const crit = ['точность', 'формат', 'стоимость'];
+    const scoreA = [0.6, 0.5, 0.8];
+    const scoreB = [0.9, 0.95, 0.7];
+
+    function modelCard(x, title, icon, color, scores) {
+      const w = width * 0.32, h = height * 0.36, y = height * 0.14;
+      box(x, y, w, h, color, '', '', { glow: 12, bg: 'rgba(5,12,18,0.94)' });
+      label(icon + ' ' + title, x + w / 2, y + 24, color, 14, 800);
+      crit.forEach((c, i) => {
+        const by = y + 58 + i * 40;
+        label(c, x + 20, by - 12, '#9fb2bf', 10.5, 700, 'left');
+        bar(x + 20, by, w - 40, 12, scores[i] * t, color);
+      });
+      return { x, y, w, h };
+    }
+
+    const A = modelCard(width * 0.09, 'Модель A', '💬', CY, scoreA);
+    const B = modelCard(width * 0.59, 'Модель B', '💬', MAG, scoreB);
+
+    // judge in center-bottom
+    const jx = width * 0.5, jy = height * 0.66;
+    ctx.save(); ctx.fillStyle = 'rgba(16,185,129,0.09)'; ctx.beginPath(); ctx.arc(jx, jy, 52, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    box(jx - 60, jy - 40, 120, 80, EM, '', '', { glow: 18 });
+    label('⚖️', jx, jy - 8, '#fff', 26);
+    label('LLM-судья', jx, jy + 18, EM, 12, 800);
+
+    // arrows from models to judge
+    line(A.x + A.w / 2, A.y + A.h, jx - 40, jy - 30, 'rgba(34,211,238,0.35)', 2);
+    line(B.x + B.w / 2, B.y + B.h, jx + 40, jy - 30, 'rgba(236,72,153,0.35)', 2);
+    flowDots(A.x + A.w / 2, A.y + A.h, jx - 40, jy - 30, CY, 0.5, 2, 3);
+    flowDots(B.x + B.w / 2, B.y + B.h, jx + 40, jy - 30, MAG, 0.5, 2, 3);
+
+    // verdict
+    if (t >= 0.98) {
+      const vy = height * 0.80;
+      box(jx - 190, vy - 22, 380, 44, EM, '', '', { glow: 16 });
+      label('вердикт: Модель B лучше · 8/10 — точнее и в нужном формате', jx, vy, '#fff', 12.5, 800);
+      if (!customState._verd) { addShockwave(jx, vy, EM, 90); customState._verd = true; }
+    } else { customState._verd = false; label('судья оценивает по рубрике…', jx, height * 0.80, MUT, 12, 700); }
+
+    label('один вход · две модели · оценка по критериям', width / 2, height * 0.075, EM, 13, 800);
+  }
+
+  // ── Scene 9: judge ours (leaderboard) ──
+  function renderJudgeOurs() {
+    customState.rankT = Math.min(1, (customState.rankT || 0) + 0.007);
+    const t = customState.rankT;
+    const models = [
+      { name: 'Модель B', score: 0.90 },
+      { name: 'Модель A', score: 0.74 },
+      { name: 'Модель C', score: 0.58 }
+    ];
+    label('кто лучше на НАШИХ кейсах (Jira · разбор · тест-кейсы)', width / 2, height * 0.11, VIO, 13, 800);
+
+    const x0 = width * 0.14, x1 = width * 0.90;
+    models.forEach((m, i) => {
+      const y = height * (0.26 + i * 0.17);
+      const lead = i === 0;
+      const color = lead ? EM : AMB;
+      label((i + 1) + '.', x0 - 18, y, color, 15, 900, 'left');
+      label((lead ? '🏆 ' : '') + m.name, x0 + 12, y, '#fff', 14, 800, 'left');
+      bar(x0 + 150, y - 9, (x1 - x0) - 220, 18, m.score * t, color);
+      mono((m.score * t * 100).toFixed(0) + '%', x1 - 44, y, color, 15, 'left');
+    });
+
+    // rubric legend
+    label('критерии: точность · формат · стоимость', width * 0.5, height * 0.66, MUT, 12, 700);
+
+    // calibration note
+    const cy = height * 0.80;
+    box(width * 0.5 - 240, cy - 24, 480, 48, VIO, '', '', { glow: 10, bg: 'rgba(10,8,18,0.9)' });
+    label('⚖ судью калибруем на эталоне · человек проверяет спорное', width / 2, cy, '#e2ccfb', 12.5, 800);
+  }
+
+  // ── Scene 10: summary ──
+  function renderSummary() {
+    const cards = [
+      { icon: '🔧', t: 'Обвязка', s: 'инструменты + цикл + границы', color: CY, x: width * 0.35 },
+      { icon: '🩺', t: 'Разбор падений', s: 'причина вместо стены красных', color: AMB, x: width * 0.65 }
+    ];
+    const cyTop = height * 0.36, cw = 240, ch = 170;
+    cards.forEach((c, i) => {
+      const pulse = 0.5 + 0.5 * Math.sin(animTime * 2 + i * 0.7);
+      box(c.x - cw / 2, cyTop - ch / 2, cw, ch, c.color, '', '', { glow: 12 + pulse * 6 });
+      label(c.icon, c.x, cyTop - 40, '#fff', 40);
+      label(c.t, c.x, cyTop + 22, c.color, 15, 800);
+      // wrap sub into two lines if needed
+      label(c.s, c.x, cyTop + 48, '#cdd8e0', 11, 700);
+    });
+
+    // connecting flows to a human gate
+    const gx = width * 0.5, gy = height * 0.74;
+    cards.forEach(c => {
+      line(c.x, cyTop + ch / 2, gx, gy - 30, 'rgba(148,163,184,0.25)', 1.5, [4, 4]);
+      flowDots(c.x, cyTop + ch / 2, gx, gy - 30, c.color, 0.4, 2, 2.5);
+    });
+    box(gx - 150, gy - 26, 300, 52, VIO, '', '', { glow: 16 });
+    label('🙋 человек на воротах', gx, gy, '#fff', 15, 800);
+
+    label('LLM не «сам» — в обвязке и с разбором результатов', width / 2, height * 0.09, EM, 14, 800);
+  }
+
+  // ── Effects ──
+  function renderEffects() {
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const sw = shockwaves[i];
+      sw.radius += (sw.maxRadius - sw.radius) * 0.12; sw.life -= sw.decay;
+      if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
+      ctx.save(); ctx.strokeStyle = sw.color; ctx.globalAlpha = sw.life; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.x += sp.vx; sp.y += sp.vy; sp.life -= sp.decay;
+      if (sp.life <= 0) { sparks.splice(i, 1); continue; }
+      ctx.save(); ctx.fillStyle = sp.color; ctx.globalAlpha = sp.life; ctx.shadowColor = sp.color; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UI & STORY CONTROLLER
+  // ═══════════════════════════════════════════════════════════════════════════
+  const topNav = document.getElementById('top-nav');
+  const deckScroll = document.getElementById('deck-scroll');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  const btnPlay = document.getElementById('btn-play');
+  const btnRestart = document.getElementById('btn-restart');
+  const voiceToggle = document.getElementById('voice-toggle');
+  const progressBar = document.getElementById('progress-bar');
+  const slideCounter = document.getElementById('slide-counter');
+  const captionText = document.getElementById('stage-caption-text');
+  const sceneNote = document.getElementById('stage-scene-note');
+  const btnPresenter = document.getElementById('btn-presenter');
+
+  const storyNavBadges = [];
+  const slideViews = [];
+
+  const LEGENDS = {
+    intro_bridge:    [[VIO, 'LLM — просто текст'], [CY, 'обвязка / разбор'], [EM, 'QA под контролем']],
+    harness_anatomy: [[VIO, 'модель (ядро)'], [CY, 'инструменты'], [EM, 'цикл'], [AMB, 'границы']],
+    agent_loop:      [[CY, 'воспринял'], [VIO, 'спланировал'], [AMB, 'вызвал инструмент'], [EM, 'результат']],
+    harness_ours:    [[EM, 'читает — свободно'], [AMB, 'действие — через ✋'], [VIO, 'QA-агент']],
+    fail_wall:       [[EM, 'зелёный — прошёл'], [RED, 'красный — упал'], [AMB, 'жёлтый — флаки']],
+    triage_pipeline: [[RED, 'упавший тест'], [VIO, 'классификатор'], [BLUE, 'корзины причин']],
+    triage_ours:     [[RED, 'падения CI'], [VIO, 'помощник'], [EM, 'вердикт — человек ✋']],
+    summary:         [[CY, 'обвязка'], [AMB, 'разбор падений'], [VIO, 'человек на воротах']]
+  };
+  const legendEl = document.getElementById('stage-legend');
+  const stageFade = document.getElementById('stage-fade');
+
+  function updateLegend(index) {
+    const rows = LEGENDS[slidesData[index].mode];
+    if (!rows) { legendEl.style.display = 'none'; return; }
+    legendEl.style.display = 'flex';
+    legendEl.innerHTML = '<div class="legend-title">Обозначения</div>' + rows.map(
+      ([c, l]) => `<div class="legend-item"><span class="legend-dot" style="background:${c};color:${c}"></span>${l}</div>`
+    ).join('');
+  }
+
+  function buildUI() {
+    slidesData.forEach((s, idx) => {
+      if (idx > 0) {
+        const sep = document.createElement('span');
+        sep.className = 'nav-sep'; sep.textContent = '→'; topNav.appendChild(sep);
+      }
+      const b = document.createElement('button');
+      b.className = 'nav-badge' + (idx === 0 ? ' active' : '');
+      b.innerHTML = `<span class="num">${idx + 1}</span><span>${s.storyLabel}</span>`;
+      b.onclick = () => goToSlide(idx, { forceSpeak: voiceToggle.checked });
+      topNav.appendChild(b);
+      storyNavBadges.push(b);
+
+      const slide = document.createElement('div');
+      slide.className = 'slide-view' + (idx === 0 ? ' active' : '');
+      slide.innerHTML = `
+        <div class="slide-tag-line" style="color: ${s.tagColor}">${s.icon} ${s.tag}</div>
+        <h1 class="slide-title">${s.title}</h1>
+        <div class="slide-desc">${s.desc}</div>
+        <div class="callout-box ${s.calloutClass}">${s.callout}</div>
+      `;
+      deckScroll.appendChild(slide);
+      slideViews.push(slide);
+    });
+    updateUI();
+  }
+
+  function goToSlide(index, options = {}) {
+    if (index < 0 || index >= slidesData.length) return;
+    currentSlide = index;
+    if (stageFade) { stageFade.style.transition = 'none'; stageFade.style.opacity = '1'; }
+    initScene(index);
+    updateUI();
+    updatePresenterWindow(index);
+    if (stageFade) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        stageFade.style.transition = 'opacity 0.45s ease'; stageFade.style.opacity = '0';
+      }));
+    }
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+
+    const shouldSpeak = voiceToggle.checked && options.forceSpeak;
+    if (shouldSpeak) speakSlide(index);
+    else { prefetch(index); prefetch(index + 1); }
+  }
+
+  function updateUI() {
+    btnPrev.disabled = currentSlide === 0;
+    btnNext.disabled = currentSlide === slidesData.length - 1;
+    slideCounter.textContent = `${currentSlide + 1} / ${slidesData.length}`;
+    captionText.textContent = slidesData[currentSlide].caption;
+    if (sceneNote) sceneNote.textContent = slidesData[currentSlide].sceneNote || '';
+    updateLegend(currentSlide);
+    slideViews.forEach((v, i) => v.classList.toggle('active', i === currentSlide));
+    storyNavBadges.forEach((b, i) => b.classList.toggle('active', i === currentSlide));
+    const activeBadge = storyNavBadges[currentSlide];
+    if (activeBadge) activeBadge.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUDIO & TTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  let isPlaying = false;
+  let ttsAudio = null;
+  const preloadPool = {};
+  const NARRATION_VERSION = 'llmtest-8-20260831-v3';
+  voiceToggle.checked = false;
+
+  function ttsUrl(idx) {
+    const voice = localStorage.getItem('presentationVoiceChoice') || '';
+    return `narration/llm_testing/${__voiceSlug(voice)}/${idx}.mp3?v=${NARRATION_VERSION}`;
+  }
+  function prefetch(idx) {
+    if (idx < 0 || idx >= slidesData.length || preloadPool[idx]) return;
+    const a = new Audio(ttsUrl(idx)); a.preload = 'auto'; preloadPool[idx] = a;
+  }
+  function speakSlide(idx) {
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = true; btnPlay.textContent = '⏸ Пауза';
+    const audio = preloadPool[idx] || new Audio(ttsUrl(idx));
+    delete preloadPool[idx]; audio.preload = 'auto'; ttsAudio = audio;
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration) progressBar.style.width = ((audio.currentTime / audio.duration) * 100) + '%';
+    });
+    audio.addEventListener('ended', () => {
+      isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+      if (currentSlide < slidesData.length - 1) goToSlide(currentSlide + 1, { forceSpeak: true });
+    });
+    audio.play().catch(() => { isPlaying = false; btnPlay.textContent = '▶ Играть'; });
+    prefetch(idx + 1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRESENTER WINDOW
+  // ═══════════════════════════════════════════════════════════════════════════
+  let presenterWindow = null;
+  let presenterRenderToken = 0;
+  function getPresenterDoc() { return (presenterWindow && !presenterWindow.closed) ? presenterWindow.document : null; }
+  function formatNarrationHtml(text) {
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sentences = (text.match(/[^.!?…]+[.!?…]+["»)]*\s*/g) || [text]).map(s => s.trim()).filter(Boolean);
+    const paras = [];
+    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(' '));
+    return paras.map(p => '<p>' + esc(p) + '</p>').join('') || esc(text);
+  }
+  function renderPresenter(index) {
+    const doc = getPresenterDoc();
+    if (!doc) return;
+    const d = slidesData[index];
+    const token = ++presenterRenderToken;
+    const dotsHtml = slidesData.map((s, i) =>
+      `<button class="p-dot${i === index ? ' active' : ''}" data-slide="${i}" style="--p-dot:${s.tagColor}"></button>`
+    ).join('');
+    doc.body.innerHTML = `
+      <header>
+        <div>
+          <div class="eyebrow">🖥 Пульт докладчика · LLM в тестировании</div>
+          <div class="counter">Слайд ${index + 1} из ${slidesData.length}</div>
+        </div>
+        <button id="closeBtn" class="close" title="Закрыть пульт">✕</button>
+      </header>
+      <main class="notes">
+        <div class="pane-label">Точный текст озвучки &amp; Тезисы</div>
+        <div class="pv-tag" style="color:${d.tagColor}">${d.icon} ${d.tag}</div>
+        <h2>${d.title}</h2>
+        <div id="narrContent" class="pv-text">Загрузка текста озвучки…</div>
+        <div class="pv-callout">${d.callout}</div>
+        ${PRESENTER_TIPS[index] ? `<div class="pv-tip"><span class="pv-tip-label">🎛 Что на сцене</span>${PRESENTER_TIPS[index]}</div>` : ''}
+      </main>
+      <footer>
+        <button id="pPrevBtn" class="p-nav-btn" ${index === 0 ? 'disabled' : ''}>‹</button>
+        <div class="dots-wrap">${dotsHtml}</div>
+        <button id="pNextBtn" class="p-nav-btn" ${index === slidesData.length - 1 ? 'disabled' : ''}>›</button>
+      </footer>
+    `;
+    doc.getElementById('closeBtn').onclick = () => presenterWindow.close();
+    doc.getElementById('pPrevBtn').onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+    doc.getElementById('pNextBtn').onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+    doc.querySelectorAll('[data-slide]').forEach(b => {
+      b.onclick = () => goToSlide(Number(b.dataset.slide), { forceSpeak: voiceToggle.checked });
+    });
+    fetch(`narration/llm_testing/${index}.json`)
+      .then(r => { if (!r.ok) throw new Error('error'); return r.json(); })
+      .then(p => {
+        if (token !== presenterRenderToken) return;
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = formatNarrationHtml(p.text);
+      })
+      .catch(() => {
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = `<p>${d.desc}</p>`;
+      });
+  }
+  function updatePresenterWindow(index) { if (getPresenterDoc()) renderPresenter(index); }
+
+  async function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); renderPresenter(currentSlide); return; }
+    if ('documentPictureInPicture' in window) {
+      try {
+        presenterWindow = await documentPictureInPicture.requestWindow({
+          width: Math.max(380, Math.min(540, Math.round(screen.availWidth * 0.26))),
+          height: Math.max(540, Math.round(screen.availHeight * 0.88)),
+          disallowReturnToOpener: true
+        });
+      } catch (e) { presenterWindow = null; }
+    }
+    if (!presenterWindow) presenterWindow = window.open('', 'llm-testing-presenter', 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
+    if (!presenterWindow) { alert('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для пульта.'); return; }
+    presenterWindow.document.write(`<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Пульт докладчика — LLM в тестировании</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: #061019; color: #bfd6e0; font-family: 'Inter', -apple-system, sans-serif; }
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #0a1a24; border-bottom: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .eyebrow { color: #22d3ee; font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .counter { margin-top: 4px; color: #7f97a6; font-size: 11px; font-weight: 700; }
+    .close { width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    .close:hover { background: rgba(34,211,238,.25); color: #fff; }
+    .notes { flex: 1; padding: 24px 22px 90px; overflow-y: auto; }
+    .pane-label { margin-bottom: 16px; color: #5f7686; font-size: 10px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    .pv-tag { font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    h2 { margin: 10px 0 18px; color: #eef7fb; font-size: 24px; line-height: 1.2; font-weight: 800; }
+    .pv-text { font-size: 16px; line-height: 1.65; color: #d4e6ef; }
+    .pv-text p { margin-bottom: 14px; }
+    .pv-text p:first-child { font-weight: 600; color: #f0f9ff; }
+    .pv-callout { margin-top: 18px; padding: 14px 16px; border-radius: 10px; background: rgba(168,85,247,.1); border-left: 4px solid #a855f7; color: #e2ccfb; font-size: 14px; line-height: 1.5; }
+    .pv-tip { margin-top: 14px; padding: 13px 15px; border-radius: 10px; background: rgba(16,185,129,.08); border: 1px dashed rgba(16,185,129,.4); color: #bdeed7; font-size: 13.5px; line-height: 1.55; }
+    .pv-tip b { color: #eafff5; font-weight: 700; }
+    .pv-tip-label { display: block; margin-bottom: 6px; color: #10b981; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #0a1a24; border-top: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .p-nav-btn { width: 36px; height: 36px; font-size: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .p-nav-btn:hover:not(:disabled) { border-color: #22d3ee; color: #fff; background: rgba(34,211,238,.2); }
+    .p-nav-btn:disabled { opacity: .25; cursor: default; }
+    .dots-wrap { flex: 1; display: flex; justify-content: center; gap: 6px; }
+    .p-dot { width: 8px; height: 8px; border-radius: 50%; border: 0; background: #2b3f4d; cursor: pointer; transition: all 0.2s; }
+    .p-dot.active { width: 22px; border-radius: 4px; background: var(--p-dot); box-shadow: 0 0 10px var(--p-dot); }
+  </style>
+</head>
+<body></body>
+</html>`);
+    presenterWindow.document.close();
+    presenterWindow.addEventListener('pagehide', () => { btnPresenter.textContent = '🖥 Пульт'; });
+    btnPresenter.textContent = '🖥 Пульт открыт';
+    renderPresenter(currentSlide);
+    presenterWindow.focus();
+  }
+
+  // ── Event Listeners ──
+  btnPrev.onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+  btnNext.onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+  btnRestart.onclick = () => goToSlide(0, { forceSpeak: voiceToggle.checked });
+  btnPresenter.onclick = openPresenter;
+  btnPlay.onclick = () => {
+    if (isPlaying && ttsAudio) { ttsAudio.pause(); isPlaying = false; btnPlay.textContent = '▶ Играть'; }
+    else if (!isPlaying && ttsAudio) { ttsAudio.play(); isPlaying = true; btnPlay.textContent = '⏸ Пауза'; }
+    else speakSlide(currentSlide);
+  };
+  voiceToggle.addEventListener('change', () => {
+    if (!voiceToggle.checked && ttsAudio) {
+      ttsAudio.pause(); ttsAudio = null; isPlaying = false;
+      btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); btnNext.click(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); btnPrev.click(); }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); openPresenter(); }
+  });
+
+  // ── Boot ──
+  resizeCanvas();
+  buildUI();
+  const hashSlide = parseInt((location.hash || '').replace('#', ''), 10);
+  const startIndex = Number.isInteger(hashSlide) && hashSlide >= 1 && hashSlide <= slidesData.length ? hashSlide - 1 : 0;
+  currentSlide = startIndex;
+  initScene(startIndex);
+  updateUI();
+  prefetch(startIndex);
+  prefetch(startIndex + 1);
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
