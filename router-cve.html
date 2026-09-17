@@ -637,6 +637,8 @@
   </div>
 </div>
 
+<script src="mqtt.min.js"></script>
+<script src="preza-sync.js"></script>
 <script>
 (function() {
   'use strict';
@@ -1799,6 +1801,32 @@
   prefetch(startIndex);
   prefetch(startIndex + 1);
   requestAnimationFrame(animate);
+  /* ── remote slide sync (active only with ?room=) ── */
+  if (window.PrezaSync && window.PrezaSync.active) {
+    var __prezaApplying = false;
+    var __sync = window.PrezaSync.attach({
+      deckId: 'router_cve',
+      getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!isPlaying }; },
+      applyState: function (s) {
+        __prezaApplying = true;
+        try {
+          if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;
+          if (typeof s.slide === 'number' && s.slide !== currentSlide) {
+            goToSlide(s.slide, { forceSpeak: !!(s.voiceOn && s.playing) });
+          } else {
+            if (!s.voiceOn && ttsAudio) { ttsAudio.pause(); ttsAudio = null; isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%'; }
+            else if (s.playing && !isPlaying) { if (ttsAudio) { ttsAudio.play(); isPlaying = true; btnPlay.textContent = '⏸ Пауза'; } else if (s.voiceOn) { speakSlide(currentSlide); } }
+            else if (!s.playing && isPlaying && ttsAudio) { ttsAudio.pause(); isPlaying = false; btnPlay.textContent = '▶ Играть'; }
+          }
+        } finally { __prezaApplying = false; }
+      }
+    });
+    var __pub = function () { if (!__prezaApplying) __sync.publish(); };
+    var __origGo = goToSlide; goToSlide = function (i, o) { __origGo(i, o); __pub(); };
+    var __origPlay = btnPlay.onclick; btnPlay.onclick = function (e) { if (__origPlay) __origPlay.call(this, e); __pub(); };
+    voiceToggle.addEventListener('change', __pub);
+    __pub();
+  }
 })();
 </script>
 </body>

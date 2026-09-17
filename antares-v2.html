@@ -1718,6 +1718,8 @@
   </div>
 
 <script>window.__voiceSlug=function(v){v=String(v||'');return v.indexOf('elevenlabs')===0?'mine':'edge';};</script>
+<script src="mqtt.min.js"></script>
+<script src="preza-sync.js"></script>
 <script>
 // ── NAV SWITCHER ─────────────────────────────────────────────────────────────
 function showPres(id) {
@@ -3440,6 +3442,33 @@ window.runRealCommand = function(cmd, category) {
     updateNotesPanel(0);
   };
 
+  /* ── remote slide sync: chloroplasts deck (active only with ?room=) ── */
+  if (window.PrezaSync && window.PrezaSync.active) {
+    var __prezaApplying = false;
+    var __sync = window.PrezaSync.attach({
+      deckId: 'chloroplasts',
+      isActive: function () { var w = document.getElementById('wrap-chloroplasts'); return !!(w && w.classList.contains('active')); },
+      activate: function () { if (typeof showPres === 'function') showPres('wrap-chloroplasts'); },
+      getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!playing }; },
+      applyState: function (s) {
+        __prezaApplying = true;
+        try {
+          if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;
+          if (typeof s.slide === 'number' && s.slide !== currentSlide) {
+            goTo(s.slide, { forceSpeak: !!(s.voiceOn && s.playing) });
+          } else {
+            if (!s.voiceOn && ttsAudio) { ttsAudio.pause(); ttsAudio = null; playing = false; isPaused = false; playBtn.textContent = '▶ Играть'; progressBar.style.width = '0%'; }
+            else if (s.playing && !playing) { if (ttsAudio) { ttsAudio.play(); playing = true; isPaused = false; playBtn.textContent = '⏸ Пауза'; } else if (s.voiceOn) { speakSlide(currentSlide); } }
+            else if (!s.playing && playing && ttsAudio) { ttsAudio.pause(); playing = false; isPaused = true; playBtn.textContent = '▶ Играть'; }
+          }
+        } finally { __prezaApplying = false; }
+      }
+    });
+    var __pub = function () { if (!__prezaApplying) __sync.publish(); };
+    var __origGoTo = goTo; goTo = function (i, o) { __origGoTo(i, o); __pub(); };
+    playBtn.addEventListener('click', __pub);
+    voiceToggle.addEventListener('change', __pub);
+  }
   initUI();
   loop();
   // Prefetch first two slides immediately on load
@@ -4024,6 +4053,33 @@ window.runRealCommand = function(cmd, category) {
     updateControls(); renderPresenterWindow(0);
   };
 
+  /* ── remote slide sync: antares deck (active only with ?room=) ── */
+  if (window.PrezaSync && window.PrezaSync.active) {
+    var __prezaApplying = false;
+    var __sync = window.PrezaSync.attach({
+      deckId: 'antares',
+      isActive: function () { var w = document.getElementById('wrap-antares'); return !!(w && w.classList.contains('active')); },
+      activate: function () { if (typeof showPres === 'function') showPres('wrap-antares'); },
+      getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!playing }; },
+      applyState: function (s) {
+        __prezaApplying = true;
+        try {
+          if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;
+          if (typeof s.slide === 'number' && s.slide !== currentSlide) {
+            goTo(s.slide, { forceSpeak: !!(s.voiceOn && s.playing) });
+          } else {
+            if (!s.voiceOn && ttsAudio) { ttsAudio.pause(); ttsAudio = null; playing = false; isPaused = false; playBtn.textContent = '▶ Играть'; progressBar.style.width = '0%'; }
+            else if (s.playing && !playing) { if (ttsAudio) { ttsAudio.play(); playing = true; isPaused = false; playBtn.textContent = '⏸ Пауза'; } else if (s.voiceOn) { speakSlide(currentSlide); } }
+            else if (!s.playing && playing && ttsAudio) { ttsAudio.pause(); playing = false; isPaused = true; playBtn.textContent = '▶ Играть'; }
+          }
+        } finally { __prezaApplying = false; }
+      }
+    });
+    var __pub = function () { if (!__prezaApplying) __sync.publish(); };
+    var __origGoTo = goTo; goTo = function (i, o) { __origGoTo(i, o); __pub(); };
+    playBtn.addEventListener('click', __pub);
+    voiceToggle.addEventListener('change', __pub);
+  }
   initUI();
   loop();
   prefetchSlide(0);
@@ -4041,6 +4097,11 @@ window.addEventListener('pageshow', () => {
     window.resetAntaresPresentation();
   }
 });
+/* ── keep followers on the same SPA section as the lead ── */
+if (window.PrezaSync && window.PrezaSync.active && typeof showPres === 'function') {
+  var __origShowPres = showPres;
+  showPres = function (id) { __origShowPres(id); if (window.PrezaSync.republish) window.PrezaSync.republish(); };
+}
 </script>
 </body>
 </html>
