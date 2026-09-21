@@ -1770,7 +1770,9 @@ document.addEventListener('click', event => {
 
 function navTo(value) {
   if (value.startsWith('/')) {
-    window.location.href = value.replace(/^\//, '');
+    // carry the sync room/role across the jump to another deck file, so a lead
+    // stays lead (and mirrors keep mirroring) instead of dropping out of sync.
+    window.location.href = value.replace(/^\//, '') + (window.location.search || '');
     return;
   }
   showPres(value);
