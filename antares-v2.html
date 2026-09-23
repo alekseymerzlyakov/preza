@@ -1830,7 +1830,7 @@ document.getElementById('presentationSelect').addEventListener('change', event =
     speaking=false;
     const subEl=document.getElementById('hg-subtitle');
     subEl.textContent='⏳ Загрузка голоса…';
-    const audio=new Audio(`/api/tts?slide=${idx}&_=${Date.now()}`);
+    const audio=new Audio(`/api/tts?slide=${idx}`);
     ttsAudio=audio;
     const TEXTS=['В две тысячи двадцать шестом году на Каннском кинофестивале был показан фильм Хелл Гринд. Девяносто пять минут — весь видеоряд создан искусственным интеллектом. Это переломный момент в истории кинематографа.','Фильм рассказывает о четырёх ворах — Роко, Лулу, Джаксе и Рейне. Они пытаются провернуть ограбление, но открывают портал в параллельный мир. Сценарий написан людьми — искусственный интеллект создал только картинку.','Самое поразительное в этом проекте — экономика. Всего пятнадцать человек, две недели, пятьсот тысяч долларов. Обычный Голливуд тратит сотни миллионов и несколько лет работы.','Для каждых пятнадцати секунд видео команда писала промпт объёмом три тысячи слов. На первые двадцать пять минут фильма потребовалось шестнадцать тысяч черновых фрагментов.','Алекс Машрабов, сооснователь стартапа Хиггсфилд, сказал: мы хотели выяснить, может ли искусственный интеллект демократизировать доступ и устранить барьеры для творческих людей по всему миру.','Все инструменты доступны каждому прямо сейчас. Клинг, Луна, Ранвей — часть из них полностью бесплатна для первых экспериментов.','И самое главное — мы сделали это сами! За один час был создан собственный двадцатисекундный научно-фантастический мини-фильм. Будущее кино доступно прямо сейчас и стоит ноль рублей!'];
     const words=TEXTS[idx].split(/\s+/);
@@ -2449,7 +2449,7 @@ window.runRealCommand = function(cmd, category) {
     const subEl = document.getElementById('ghidra-subtitle');
     subEl.textContent = '⏳ Загрузка голоса…';
     
-    const audio = new Audio(`/api/tts?pres=ghidra&slide=${idx}&_=${Date.now()}`);
+    const audio = new Audio(`/api/tts?pres=ghidra&slide=${idx}`);
     ttsAudio = audio;
 
     const textList = [
@@ -3383,7 +3383,11 @@ window.runRealCommand = function(cmd, category) {
     });
   }
 
-  function loop() { updatePhysics(); draw(); requestAnimationFrame(loop); }
+  function loop() {
+    var w = document.getElementById('wrap-chloroplasts');
+    if (!document.hidden && w && w.classList.contains('active')) { updatePhysics(); draw(); }
+    requestAnimationFrame(loop);
+  }
 
   lightSlider.addEventListener('input', e => {
     lightValText.textContent = `${e.target.value}%`;
@@ -3444,13 +3448,16 @@ window.runRealCommand = function(cmd, category) {
 
   /* ── remote slide sync: chloroplasts deck (active only with ?room=) ── */
   if (window.PrezaSync && window.PrezaSync.active) {
-    var __prezaApplying = false;
+    var __prezaApplying = false, __lastApplied = '';
     var __sync = window.PrezaSync.attach({
       deckId: 'chloroplasts',
       isActive: function () { var w = document.getElementById('wrap-chloroplasts'); return !!(w && w.classList.contains('active')); },
       activate: function () { if (typeof showPres === 'function') showPres('wrap-chloroplasts'); },
       getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!playing }; },
       applyState: function (s) {
+        var __k = s.slide + '|' + (!!s.voiceOn) + '|' + (!!s.playing);
+        if (__k === __lastApplied) return;
+        __lastApplied = __k;
         __prezaApplying = true;
         try {
           if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;
@@ -3894,7 +3901,11 @@ window.runRealCommand = function(cmd, category) {
     goSave.style.color = (beamOn && verifyOn) ? '#22c55e' : '#c8dcef';
   }
 
-  function loop() { draw(); requestAnimationFrame(loop); }
+  function loop() {
+    var w = document.getElementById('wrap-antares');
+    if (!document.hidden && w && w.classList.contains('active')) { draw(); }
+    requestAnimationFrame(loop);
+  }
 
   // ── voice sync (mirrors chloroplasts) ──────────────────────────────────────
   const preloadPool = {};
@@ -4055,13 +4066,19 @@ window.runRealCommand = function(cmd, category) {
 
   /* ── remote slide sync: antares deck (active only with ?room=) ── */
   if (window.PrezaSync && window.PrezaSync.active) {
-    var __prezaApplying = false;
+    var __prezaApplying = false, __lastApplied = '';
     var __sync = window.PrezaSync.attach({
-      deckId: 'antares',
+      // deckId 'antares_v2' (not 'antares') so this page's deck does NOT collide
+      // with index.html's antares deck on the shared MQTT topic, and the pult can
+      // target v1 vs v2 distinctly.
+      deckId: 'antares_v2',
       isActive: function () { var w = document.getElementById('wrap-antares'); return !!(w && w.classList.contains('active')); },
       activate: function () { if (typeof showPres === 'function') showPres('wrap-antares'); },
       getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!playing }; },
       applyState: function (s) {
+        var __k = s.slide + '|' + (!!s.voiceOn) + '|' + (!!s.playing);
+        if (__k === __lastApplied) return;
+        __lastApplied = __k;
         __prezaApplying = true;
         try {
           if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;

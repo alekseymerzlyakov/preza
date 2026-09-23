@@ -1041,6 +1041,7 @@
   // ═══════════════════════════════════════════════════════════════════════════
   function animate() {
     requestAnimationFrame(animate);
+    if (document.hidden) return; // pause heavy canvas work when tab/window not visible
     animTime += 0.016;
     ctx.clearRect(0, 0, width, height);
     drawBackgroundGrid();
@@ -1974,11 +1975,14 @@
   requestAnimationFrame(animate);
   /* ── remote slide sync (active only with ?room=) ── */
   if (window.PrezaSync && window.PrezaSync.active) {
-    var __prezaApplying = false;
+    var __prezaApplying = false, __lastApplied = '';
     var __sync = window.PrezaSync.attach({
       deckId: 'block_design',
       getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!isPlaying }; },
       applyState: function (s) {
+        var __k = s.slide + '|' + (!!s.voiceOn) + '|' + (!!s.playing);
+        if (__k === __lastApplied) return;
+        __lastApplied = __k;
         __prezaApplying = true;
         try {
           if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;

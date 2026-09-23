@@ -34,7 +34,37 @@
   var BROKER = params.get('broker') || localStorage.getItem('prezaBroker') || 'wss://broker.emqx.io:8084/mqtt';
 
   var TOPIC = ROOM ? 'preza/' + ROOM + '/state' : '';
-  var client = null, connected = false, adapters = [], started = false, pubTimer = null, lastSentJson = '';
+  var client = null, connected = false, adapters = [], started = false, pubTimer = null, lastSentJson = '', warnedDecks = {}, navigating = false;
+  // Menu gate: on the index.html menu a mirror must NOT auto-jump into a deck
+  // (retained broker state would otherwise yank you off the menu before you can
+  // even pick "share from this computer"). optedIn flips on via startMirroring().
+  var optedIn = false, lastPending = null;
+  function onMenu() { var m = document.getElementById('wrap-menu'); return !!(m && m.classList.contains('active')); }
+
+  // Canonical page for each deckId. A follower (mirror) that receives a deck it
+  // does NOT host locally hops to the right page — keeping ?room=/?role= — and
+  // mirrors there. This lets the phone pult switch between presentations that
+  // live in different HTML files while the shared screen follows along.
+  var DECK_PAGES = {
+    chloroplasts: 'index.html', antares: 'index.html',
+    antares_v2: 'antares-v2.html',
+    cham: 'cham.html', cham_v2: 'cham-v2.html',
+    router_cve: 'router-cve.html', llm_testing: 'llm-testing.html',
+    block_design: 'block-design.html'
+  };
+  function pageBasename(p) { p = String(p).split('?')[0].split('#')[0]; var i = p.lastIndexOf('/'); return (i >= 0 ? p.slice(i + 1) : p) || 'index.html'; }
+  // Returns true if it kicked off a navigation (caller should stop handling).
+  function navigateToDeckPage(deckId) {
+    if (navigating || ROLE === 'lead') return false;      // only mirrors follow across pages
+    var target = DECK_PAGES[deckId];
+    if (!target) return false;
+    if (pageBasename(location.pathname) === target) return false; // already here
+    navigating = true;
+    var qs = new URLSearchParams(location.search).toString();  // preserve room/role/sync
+    var dir = location.pathname.replace(/[^/]*$/, '');         // dir of current page (works under subpaths)
+    location.href = dir + target + (qs ? '?' + qs : '');
+    return true;
+  }
 
   // Multiple decks can live on one page (SPA). Route by the section that is active.
   // Prefer a gated adapter whose section is active; else a non-gated (standalone) one;
@@ -61,6 +91,24 @@
 
   function el(tag, css, text) { var e = document.createElement(tag); if (css) e.style.cssText = css; if (text != null) e.textContent = text; return e; }
   function onReady(fn) { if (document.body) fn(); else document.addEventListener('DOMContentLoaded', fn); }
+
+  // ── pause CSS animations while not visible / on inactive SPA decks ────────────
+  // Loaded by every deck. Zero visual change: the `data-preza-hidden` rule only
+  // bites when the page is not on screen (backgrounded/occluded), and the
+  // `.pres-wrap:not(.active)` rule only touches non-visible deck sections — the
+  // active, visible deck keeps every animation. Frees the compositor during a
+  // call when the deck tab isn't the foreground window.
+  (function () {
+    var css = 'html[data-preza-hidden="1"] *,html[data-preza-hidden="1"] *::before,html[data-preza-hidden="1"] *::after{animation-play-state:paused!important}'
+            + '.pres-wrap:not(.active) *{animation-play-state:paused!important}';
+    var syncHidden = function () { document.documentElement.setAttribute('data-preza-hidden', document.hidden ? '1' : '0'); };
+    syncHidden();
+    document.addEventListener('visibilitychange', syncHidden);
+    onReady(function () {
+      var st = document.createElement('style'); st.textContent = css;
+      (document.head || document.body || document.documentElement).appendChild(st);
+    });
+  })();
   // Reload the SAME page/deck keeping ?room=, applying param overrides ('' deletes a key).
   function goTo(overrides) {
     var p = new URLSearchParams(location.search);
@@ -123,7 +171,11 @@
   function connect() {
     if (typeof mqtt === 'undefined') { console.error('[preza-sync] mqtt.js not loaded — sync disabled'); return; }
     var clientId = 'preza-' + ROLE + '-' + Math.floor(Math.random() * 1e9).toString(36);
-    client = mqtt.connect(BROKER, { clientId: clientId, clean: true, keepalive: 30, reconnectPeriod: 2000, connectTimeout: 8000 });
+    // reconnectPeriod raised from 2000 → 6000: while a browser encodes+uploads
+    // screen+audio into a call the WS drops often; a 2s reconnect meant the broker
+    // redelivered the retained state (→ applyState → speakSlide) every 2s. 6s with
+    // retained state still recovers quickly but stops the re-apply storm.
+    client = mqtt.connect(BROKER, { clientId: clientId, clean: true, keepalive: 30, reconnectPeriod: 6000, connectTimeout: 8000 });
 
     client.on('connect', function () {
       connected = true; setDot('#2ecc71');
@@ -139,13 +191,28 @@
       var msg; try { msg = JSON.parse(payload.toString()); } catch (e) { return; }
       if (ROLE === 'lead') return; // lead is the source of truth
       if (!msg || !msg.deckId) return;
-      var a = adapterById(msg.deckId);
-      if (!a) { console.warn('[preza-sync] no local player for deck "' + msg.deckId + '" — open that deck to mirror it'); return; }
-      try {
-        if (a.activate && a.isActive && !a.isActive()) a.activate(); // switch SPA section to match the lead
-        a.applyState(msg);
-      } catch (e) { console.warn('[preza-sync] applyState failed', e); }
+      // On the index menu, hold the latest state but don't follow until the user
+      // clicks "показывать с компа" (startMirroring). Other pages mirror at once.
+      if (!optedIn && onMenu()) { lastPending = msg; return; }
+      handleMessage(msg);
     });
+  }
+
+  // Reconcile this mirror to one remote state (switch page / SPA section / slide).
+  function handleMessage(msg) {
+    var a = adapterById(msg.deckId);
+    // No local player for this deck? If it belongs on another page, hop there and
+    // mirror. Otherwise warn once (fires for every message about a deck not open
+    // here — all decks share one topic — which used to spam the console).
+    if (!a) {
+      if (navigateToDeckPage(msg.deckId)) return;
+      if (!warnedDecks[msg.deckId]) { warnedDecks[msg.deckId] = 1; console.warn('[preza-sync] no local player for deck "' + msg.deckId + '" — open that deck to mirror it'); }
+      return;
+    }
+    try {
+      if (a.activate && a.isActive && !a.isActive()) a.activate(); // switch SPA section to match the lead
+      a.applyState(msg);
+    } catch (e) { console.warn('[preza-sync] applyState failed', e); }
   }
 
   // ── publish (lead only) ─────────────────────────────────────────────────────
@@ -155,10 +222,14 @@
     if (!a) return;
     var s = a.getState() || {};
     var payload = { deckId: a.deckId, slide: s.slide, voiceOn: !!s.voiceOn, playing: !!s.playing, ts: Date.now() };
-    var json = JSON.stringify(payload);
-    if (json === lastSentJson) return;
-    lastSentJson = json;
-    client.publish(TOPIC, json, { qos: 0, retain: true });
+    // Dedup on the MEANINGFUL fields only. `ts` changes every call, so including
+    // it here made `json === lastSentJson` never true — the lead then re-published
+    // identical state on every reconnect and every follower re-ran applyState
+    // (~every 2s under a flaky screen-share connection). Compare without ts.
+    var key = a.deckId + '|' + s.slide + '|' + (!!s.voiceOn) + '|' + (!!s.playing);
+    if (key === lastSentJson) return;
+    lastSentJson = key;
+    client.publish(TOPIC, JSON.stringify(payload), { qos: 0, retain: true });
   }
   function publishSoon() { if (ROLE !== 'lead') return; clearTimeout(pubTimer); pubTimer = setTimeout(publishNow, 40); }
 
@@ -170,6 +241,15 @@
     role: ROLE,
     room: ROOM,
     republish: publishSoon, // SPAs call this after switching sections so followers follow the switch
+    // Called by the index menu's "показывать с компа" button: opt this screen into
+    // mirroring and immediately jump to whatever the lead is currently showing.
+    // Returns true if it kicked off a page navigation (caller's page will unload).
+    startMirroring: function () {
+      optedIn = true;
+      if (lastPending) { var before = navigating; handleMessage(lastPending); return navigating && !before; }
+      return false;
+    },
+    isLeadPending: function () { return !!lastPending; },
     attach: function (a) {
       adapters.push(a);
       if (!ROOM) return { publish: function () {} };

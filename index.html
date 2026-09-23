@@ -79,6 +79,32 @@
     .menu-card .mc-desc { color:#8b949e; font-size:.82rem; line-height:1.35; }
     .menu-card .mc-go { margin-left:auto; color:#58a6ff; font-size:1.25rem; flex:0 0 auto; }
 
+    /* ── how-to-present control bar ── */
+    .present-bar { display:flex; gap:12px; flex-wrap:wrap; margin:0 0 14px; }
+    .present-btn { flex:1 1 240px; display:flex; align-items:center; gap:12px; text-align:left; cursor:pointer;
+      padding:14px 16px; border-radius:12px; border:1px solid #2b3442; background:#12171f; color:#e6edf3;
+      font:700 .95rem 'Inter',sans-serif; transition:border-color .15s, background .15s, transform .06s; }
+    .present-btn:hover { border-color:#58a6ff; background:#161c25; }
+    .present-btn:active { transform:translateY(1px); }
+    .present-btn.primary { border-color:rgba(0,212,106,.5); background:rgba(0,212,106,.08); }
+    .present-btn.primary:hover { border-color:var(--emerald); background:rgba(0,212,106,.14); }
+    .present-btn .pb-ico { font-size:1.4rem; flex:0 0 auto; }
+    .present-btn .pb-body { display:grid; gap:2px; min-width:0; }
+    .present-btn .pb-sub { color:#8b949e; font-weight:500; font-size:.78rem; line-height:1.3; }
+    .present-panel { margin:0 0 18px; padding:14px 16px; border:1px solid #2b3442; border-radius:12px; background:#0d1117; }
+    .present-panel[hidden] { display:none; }
+    .present-panel .pp-label { color:#8b949e; font-size:.8rem; margin-bottom:8px; }
+    .present-panel .pult-link { display:block; word-break:break-all; color:#58a6ff; font-weight:700;
+      background:#12171f; border:1px solid #2b3442; border-radius:8px; padding:10px 12px; text-decoration:none; }
+    .present-panel .pp-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .present-panel .pp-actions button { cursor:pointer; padding:8px 12px; border-radius:8px; border:1px solid #2b3442;
+      background:#12171f; color:#c9d4e0; font:600 .82rem 'Inter',sans-serif; }
+    .present-panel .pp-actions button:hover { border-color:#58a6ff; color:#e6edf3; }
+    .present-panel .pp-hint { color:#6f7d8c; font-size:.74rem; margin-top:8px; line-height:1.4; }
+    .present-toast { margin:0 0 18px; padding:12px 16px; border-radius:10px; border:1px solid rgba(0,212,106,.4);
+      background:rgba(0,212,106,.08); color:#9be9c1; font-size:.86rem; line-height:1.45; }
+    .present-toast[hidden] { display:none; }
+
     /* ════════════════════════════════════════════
        AI MOVIE STYLES
     ════════════════════════════════════════════ */
@@ -1261,6 +1287,31 @@
       <div class="menu-inner">
         <h1 class="menu-h">Презентации</h1>
         <p class="menu-sub">Выбери презентацию из списка ниже. Голос докладчика (мой или стандартный) переключается в настройках&nbsp;★ сверху и прямо внутри каждой презентации.</p>
+
+        <div class="present-bar">
+          <button class="present-btn primary" id="present-share">
+            <span class="pb-ico">🖥</span>
+            <span class="pb-body"><span>Показывать с этого компьютера</span>
+              <span class="pb-sub">Этот экран расшариваешь в звонок — он повторяет за пультом</span></span>
+          </button>
+          <button class="present-btn" id="present-phone">
+            <span class="pb-ico">📱</span>
+            <span class="pb-body"><span>Вести с телефона / другого браузера</span>
+              <span class="pb-sub">Пульт: там читаешь текст и листаешь слайды</span></span>
+          </button>
+        </div>
+        <div class="present-toast" id="present-toast" hidden></div>
+        <div class="present-panel" id="present-phone-panel" hidden>
+          <div class="pp-label">Открой эту ссылку на телефоне (или в другом браузере) — та&nbsp;же комната:</div>
+          <a class="pult-link" id="pult-link" target="_blank" rel="noopener"></a>
+          <div class="pp-actions">
+            <button id="pult-copy">Копировать ссылку</button>
+            <button id="pult-open">Открыть в новой вкладке</button>
+            <button id="pult-close">Скрыть</button>
+          </div>
+          <div class="pp-hint">Телефон становится ведущим и листает; этот компьютер — зеркало. Свой экран телефона показывать не нужно.</div>
+        </div>
+
         <div class="menu-list" id="menu-list">
           <button class="menu-card" data-nav="/block-design.html"><span class="mc-ico">◆</span><span class="mc-body"><span class="mc-title">Блок-дизайн</span><span class="mc-desc">Комбинаторика баланса: BIBD, Фано, Штейнер</span></span><span class="mc-go">›</span></button>
           <button class="menu-card" data-nav="/llm-testing.html"><span class="mc-ico">🧪</span><span class="mc-body"><span class="mc-title">LLM в тестировании</span><span class="mc-desc">Harness и разбор падений автотестов</span></span><span class="mc-go">›</span></button>
@@ -1566,7 +1617,7 @@
               <div class="brand-logo">🌿 Elodea Densa</div>
               <div class="brand-tag">Танец Хлоропластов · Биофизика · Граф-теория</div>
             </div>
-            <button class="presenter-btn" id="ch-presenter-btn" title="Открыть пульт докладчика в отдельном окне">🖥 Пульт докладчика</button>
+            <button class="presenter-btn" id="ch-presenter-btn" title="Открыть пульт на телефоне / в другой вкладке">📱 Пульт на телефоне</button>
           </div>
           <div class="slides-container" id="ch-slides-container"></div>
           <div class="sim-controls-panel">
@@ -1659,7 +1710,7 @@
               <div class="brand-logo">🛡 Cisco Antares</div>
               <div class="brand-tag">Открытые модели · Локализация уязвимостей · AppSec</div>
             </div>
-            <button class="presenter-btn" id="an-presenter-btn" title="Открыть пульт докладчика в отдельном окне">🖥 Пульт докладчика</button>
+            <button class="presenter-btn" id="an-presenter-btn" title="Открыть пульт на телефоне / в другой вкладке">📱 Пульт на телефоне</button>
           </div>
           <div class="slides-container" id="an-slides-container"></div>
           <div class="sim-controls-panel">
@@ -1789,6 +1840,61 @@ document.getElementById('menu-list').addEventListener('click', event => {
   sel.dispatchEvent(new Event('change'));
 });
 
+// ── how to present: share from this computer, or drive from a phone ──────────
+(function () {
+  const shareBtn = document.getElementById('present-share');
+  const phoneBtn = document.getElementById('present-phone');
+  const panel    = document.getElementById('present-phone-panel');
+  const toast    = document.getElementById('present-toast');
+  const link     = document.getElementById('pult-link');
+  if (!shareBtn) return;
+
+  function pultUrl() {
+    const u = new URL('presenter.html', location.href);
+    const room = new URLSearchParams(location.search).get('room');
+    if (room) u.searchParams.set('room', room);
+    return u.href;
+  }
+  function showToast(html) { toast.innerHTML = html; toast.hidden = false; }
+
+  // "Показывать с этого компьютера": opt this screen into MIRROR mode and jump to
+  // whatever the phone is currently showing (this is what makes it the shared screen).
+  shareBtn.addEventListener('click', () => {
+    const S = window.PrezaSync;
+    if (!S || !S.active) {
+      // sync is off → re-enable as a mirror, preserving room
+      const p = new URLSearchParams(location.search);
+      p.delete('sync'); p.delete('role');
+      location.href = location.pathname + (p.toString() ? '?' + p.toString() : '') + location.hash;
+      return;
+    }
+    if (S.role === 'lead') {
+      showToast('⚠️ Этот экран сейчас <b>ведущий</b>. Чтобы вести с телефона, нажмите «🖥 Отдать управление» в бейдже справа-снизу — тогда компьютер станет зеркалом.');
+      return;
+    }
+    const navigating = S.startMirroring && S.startMirroring(); // may navigate to the deck's page
+    if (!navigating) {
+      showToast('✅ Готово. Расшарьте <b>эту вкладку</b> в звонок. Слайды и звук листайте с телефона — экран повторит. Комната: <b>' + (S.room || '—') + '</b>.');
+    }
+  });
+
+  // "Вести с телефона": show the pult link (same room) to open on the phone.
+  phoneBtn.addEventListener('click', () => {
+    link.textContent = pultUrl();
+    link.href = pultUrl();
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  document.getElementById('pult-open').addEventListener('click', () => window.open(pultUrl(), '_blank', 'noopener'));
+  document.getElementById('pult-close').addEventListener('click', () => { panel.hidden = true; });
+  document.getElementById('pult-copy').addEventListener('click', () => {
+    const url = pultUrl();
+    const done = () => { const b = document.getElementById('pult-copy'); b.textContent = 'Скопировано ✓'; setTimeout(() => b.textContent = 'Копировать ссылку', 1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => {});
+    else { link.focus(); const r = document.createRange(); r.selectNode(link); const s = getSelection(); s.removeAllRanges(); s.addRange(r); try { document.execCommand('copy'); done(); } catch (e) {} s.removeAllRanges(); }
+  });
+})();
+
 // ── HELL GRIND ───────────────────────────────────────────────────────────────
 (function() {
   const TOTAL = 7;
@@ -1854,7 +1960,7 @@ document.getElementById('menu-list').addEventListener('click', event => {
     speaking=false;
     const subEl=document.getElementById('hg-subtitle');
     subEl.textContent='⏳ Загрузка голоса…';
-    const audio=new Audio(`/api/tts?slide=${idx}&_=${Date.now()}`);
+    const audio=new Audio(`/api/tts?slide=${idx}`);
     ttsAudio=audio;
     const TEXTS=['В две тысячи двадцать шестом году на Каннском кинофестивале был показан фильм Хелл Гринд. Девяносто пять минут — весь видеоряд создан искусственным интеллектом. Это переломный момент в истории кинематографа.','Фильм рассказывает о четырёх ворах — Роко, Лулу, Джаксе и Рейне. Они пытаются провернуть ограбление, но открывают портал в параллельный мир. Сценарий написан людьми — искусственный интеллект создал только картинку.','Самое поразительное в этом проекте — экономика. Всего пятнадцать человек, две недели, пятьсот тысяч долларов. Обычный Голливуд тратит сотни миллионов и несколько лет работы.','Для каждых пятнадцати секунд видео команда писала промпт объёмом три тысячи слов. На первые двадцать пять минут фильма потребовалось шестнадцать тысяч черновых фрагментов.','Алекс Машрабов, сооснователь стартапа Хиггсфилд, сказал: мы хотели выяснить, может ли искусственный интеллект демократизировать доступ и устранить барьеры для творческих людей по всему миру.','Все инструменты доступны каждому прямо сейчас. Клинг, Луна, Ранвей — часть из них полностью бесплатна для первых экспериментов.','И самое главное — мы сделали это сами! За один час был создан собственный двадцатисекундный научно-фантастический мини-фильм. Будущее кино доступно прямо сейчас и стоит ноль рублей!'];
     const words=TEXTS[idx].split(/\s+/);
@@ -2473,7 +2579,7 @@ window.runRealCommand = function(cmd, category) {
     const subEl = document.getElementById('ghidra-subtitle');
     subEl.textContent = '⏳ Загрузка голоса…';
     
-    const audio = new Audio(`/api/tts?pres=ghidra&slide=${idx}&_=${Date.now()}`);
+    const audio = new Audio(`/api/tts?pres=ghidra&slide=${idx}`);
     ttsAudio = audio;
 
     const textList = [
@@ -3238,8 +3344,15 @@ window.runRealCommand = function(cmd, category) {
     });
   }
 
+  // Open the standalone phone pult instead of the in-page Document-PiP window.
+  // The PiP pult ran a second render + TTS-script fetch INSIDE the shared tab,
+  // adding load and audio races during a call; the phone pult offloads all of it.
   presenterBtn.addEventListener('click', () => {
-    openPresenterWindow();
+    const p = new URLSearchParams();
+    p.set('deck', 'chloroplasts');
+    const room = new URLSearchParams(location.search).get('room');
+    if (room) p.set('room', room);
+    window.open('presenter.html?' + p.toString(), '_blank', 'noopener');
   });
 
   notesClose.addEventListener('click', () => {
@@ -3891,7 +4004,15 @@ window.runRealCommand = function(cmd, category) {
     }
   }
 
-  function loop() { updatePhysics(); draw(); requestAnimationFrame(loop); }
+  // Only do the heavy per-frame physics+canvas work when THIS deck is the visible,
+  // active section. Otherwise the loop keeps spinning cheaply so it resumes on
+  // activation. Without this gate both index.html decks painted at 60fps forever
+  // (even when display:none), starving the screen-share encoder → glitching.
+  function loop() {
+    var w = document.getElementById('wrap-chloroplasts');
+    if (!document.hidden && w && w.classList.contains('active')) { updatePhysics(); draw(); }
+    requestAnimationFrame(loop);
+  }
 
   lightSlider.addEventListener('input', e => {
     lightValText.textContent = `${e.target.value}%`;
@@ -3959,13 +4080,19 @@ window.runRealCommand = function(cmd, category) {
 
   /* ── remote slide sync for the chloroplasts deck (active only with ?room=) ── */
   if (window.PrezaSync && window.PrezaSync.active) {
-    var __prezaApplying = false;
+    var __prezaApplying = false, __lastApplied = '';
     var __sync = window.PrezaSync.attach({
       deckId: 'chloroplasts',
       isActive: function () { var w = document.getElementById('wrap-chloroplasts'); return !!(w && w.classList.contains('active')); },
       activate: function () { if (typeof showPres === 'function') showPres('wrap-chloroplasts'); },
       getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!playing }; },
       applyState: function (s) {
+        // Ignore redelivered/retained duplicates: a re-apply of identical state
+        // must NOT re-run goTo/speakSlide (that caused a fresh TTS fetch every ~2s
+        // on reconnect during screen-share). Only real transitions pass through.
+        var __k = s.slide + '|' + (!!s.voiceOn) + '|' + (!!s.playing);
+        if (__k === __lastApplied) return;
+        __lastApplied = __k;
         __prezaApplying = true;
         try {
           if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;
@@ -4196,7 +4323,14 @@ window.runRealCommand = function(cmd, category) {
     renderPresenterWindow(currentSlide);
     presenterWindow.focus();
   }
-  presenterBtn.addEventListener('click', () => openPresenterWindow());
+  // Open the standalone phone pult (see chloroplasts deck) — not the in-page PiP.
+  presenterBtn.addEventListener('click', () => {
+    const p = new URLSearchParams();
+    p.set('deck', 'antares');
+    const room = new URLSearchParams(location.search).get('room');
+    if (room) p.set('room', room);
+    window.open('presenter.html?' + p.toString(), '_blank', 'noopener');
+  });
 
   // ── Canvas: repository triage visualization ────────────────────────────────
   let WIDTH = 600, HEIGHT = 380;
@@ -4402,7 +4536,14 @@ window.runRealCommand = function(cmd, category) {
     goSave.style.color = (beamOn && verifyOn) ? '#22c55e' : '#c8dcef';
   }
 
-  function loop() { draw(); requestAnimationFrame(loop); }
+  // Paint only when the antares deck is the visible, active section (see the
+  // chloroplasts loop for why). Prevents an off-screen 60fps canvas loop from
+  // stealing CPU/GPU from the screen-share encoder.
+  function loop() {
+    var w = document.getElementById('wrap-antares');
+    if (!document.hidden && w && w.classList.contains('active')) { draw(); }
+    requestAnimationFrame(loop);
+  }
 
   // ── voice sync (mirrors chloroplasts) ──────────────────────────────────────
   const preloadPool = {};
@@ -4562,13 +4703,18 @@ window.runRealCommand = function(cmd, category) {
 
   /* ── remote slide sync: antares deck (active only with ?room=) ── */
   if (window.PrezaSync && window.PrezaSync.active) {
-    var __prezaApplying = false;
+    var __prezaApplying = false, __lastApplied = '';
     var __sync = window.PrezaSync.attach({
       deckId: 'antares',
       isActive: function () { var w = document.getElementById('wrap-antares'); return !!(w && w.classList.contains('active')); },
       activate: function () { if (typeof showPres === 'function') showPres('wrap-antares'); },
       getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!playing }; },
       applyState: function (s) {
+        // Ignore redelivered/retained duplicates (see chloroplasts deck): only
+        // real slide/voice/playing transitions run goTo/speakSlide.
+        var __k = s.slide + '|' + (!!s.voiceOn) + '|' + (!!s.playing);
+        if (__k === __lastApplied) return;
+        __lastApplied = __k;
         __prezaApplying = true;
         try {
           if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;

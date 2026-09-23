@@ -793,11 +793,14 @@
   prefetch(startIndex); prefetch(startIndex + 1);
   /* ── remote slide sync (active only with ?room=) ── */
   if (window.PrezaSync && window.PrezaSync.active) {
-    var __prezaApplying = false;
+    var __prezaApplying = false, __lastApplied = '';
     var __sync = window.PrezaSync.attach({
       deckId: 'cham',
       getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!playing }; },
       applyState: function (s) {
+        var __k = s.slide + '|' + (!!s.voiceOn) + '|' + (!!s.playing);
+        if (__k === __lastApplied) return;
+        __lastApplied = __k;
         __prezaApplying = true;
         try {
           if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;
