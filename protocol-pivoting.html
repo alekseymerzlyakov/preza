@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Protocol pivoting · ахиллесова пята ИИ-агентов</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #04070a; }
+
+    /* console-deck shell (shared with router-cve/cham); cyan primary + violet LLM accent */
+    #cham-app {
+      --bg: #04070b;
+      --panel: #0a1018;
+      --panel-glass: rgba(10, 16, 24, 0.75);
+      --border: rgba(34, 211, 238, 0.22);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --text: #eaf6fb;
+      --muted: #8fa3b3;
+      --violet: #a855f7;
+      --violet-glow: rgba(168, 85, 247, 0.45);
+      --magenta: #ec4899;
+      --cyan: #22d3ee;
+      --cyan-glow: rgba(34, 211, 238, 0.4);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.4);
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      --red: #ef4444;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Top Story Navigator ── */
+    .top-nav {
+      flex-shrink: 0;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, #071820 0%, #04070b 100%);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
+      z-index: 10;
+    }
+    .top-nav::-webkit-scrollbar { height: 3px; }
+    .top-nav::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 3px; }
+
+    .nav-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-badge:hover {
+      color: #fff;
+      border-color: var(--cyan);
+      background: rgba(34, 211, 238, 0.12);
+      transform: translateY(-1px);
+    }
+    .nav-badge.active {
+      color: #04141a;
+      background: linear-gradient(135deg, #67e8f9, #22d3ee);
+      border-color: #67e8f9;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+    .nav-badge .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.25);
+      color: inherit;
+      font-size: 0.62rem;
+      font-weight: 800;
+    }
+    .nav-sep { color: rgba(34, 211, 238, 0.35); font-size: 0.75rem; flex-shrink: 0; }
+
+    /* ── Main Layout ── */
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* ── Left Narrative Deck ── */
+    .deck-panel {
+      width: 480px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg, #071620 0%, #04070b 100%);
+      z-index: 5;
+      box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.02em;
+    }
+    .brand-title span { color: var(--violet); }
+    .brand-subtitle { font-size: 0.7rem; color: var(--muted); font-weight: 500; margin-top: 2px; }
+
+    .btn-presenter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(34, 211, 238, 0.08);
+      color: var(--cyan);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-presenter:hover {
+      background: rgba(34, 211, 238, 0.22);
+      border-color: #67e8f9;
+      color: #fff;
+    }
+
+    .deck-scroll {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 28px 32px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .deck-scroll::-webkit-scrollbar { width: 4px; }
+    .deck-scroll::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.25); border-radius: 2px; }
+
+    .slide-view { display: none; animation: slideFade 0.35s ease-out; }
+    .slide-view.active { display: block; }
+    @keyframes slideFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .slide-tag-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .slide-tag-line::before {
+      content: '';
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .slide-title {
+      font-size: 1.85rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.18;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+
+    .slide-desc {
+      font-size: 1.02rem;
+      line-height: 1.68;
+      color: #cddbe4;
+      margin-bottom: 18px;
+    }
+    .slide-desc strong { color: #fff; font-weight: 700; }
+    .slide-desc .hl-cyan { color: var(--cyan); font-weight: 700; }
+    .slide-desc .hl-violet { color: #c084fc; font-weight: 700; }
+    .slide-desc .hl-blue { color: #60a5fa; font-weight: 700; }
+    .slide-desc .hl-emerald { color: var(--emerald); font-weight: 700; }
+    .slide-desc .hl-amber { color: var(--amber); font-weight: 700; }
+    .slide-desc .hl-red { color: var(--red); font-weight: 700; }
+
+    .callout-box {
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(34, 211, 238, 0.08);
+      border: 1px solid rgba(34, 211, 238, 0.28);
+      border-left: 4px solid var(--cyan);
+      color: #c6e7ef;
+      font-size: 0.92rem;
+      line-height: 1.58;
+      margin-top: 14px;
+    }
+    .callout-box.emerald {
+      background: rgba(16, 185, 129, 0.07);
+      border-color: rgba(16, 185, 129, 0.28);
+      border-left-color: var(--emerald);
+      color: #a7e5ce;
+    }
+    .callout-box.cyan {
+      background: rgba(34, 211, 238, 0.07);
+      border-color: rgba(34, 211, 238, 0.28);
+      border-left-color: var(--cyan);
+      color: #b2eaf5;
+    }
+    .callout-box.violet {
+      background: rgba(168, 85, 247, 0.08);
+      border-color: rgba(168, 85, 247, 0.3);
+      border-left-color: var(--violet);
+      color: #ddc4fb;
+    }
+    .callout-box.amber {
+      background: rgba(245, 158, 11, 0.07);
+      border-color: rgba(245, 158, 11, 0.28);
+      border-left-color: var(--amber);
+      color: #ecd29b;
+    }
+    .callout-box.blue {
+      background: rgba(59, 130, 246, 0.07);
+      border-color: rgba(59, 130, 246, 0.28);
+      border-left-color: var(--blue);
+      color: #b9d6fc;
+    }
+    .callout-box.red {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.3);
+      border-left-color: var(--red);
+      color: #f6b9b9;
+    }
+    .callout-box b, .callout-box strong { color: #fff; }
+
+    .code-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(168, 85, 247, 0.14);
+      border: 1px solid rgba(168, 85, 247, 0.32);
+      color: #e2ccfb;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      font-weight: 700;
+    }
+
+    /* ── Bottom Deck Controls ── */
+    .deck-controls {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      gap: 8px;
+      flex-shrink: 0;
+      background: #061019;
+    }
+    .ctl-btn {
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .ctl-btn.icon-only { width: 34px; padding: 0; font-size: 15px; }
+    .ctl-btn.primary {
+      background: var(--cyan);
+      color: #04141a;
+      border: none;
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+    .ctl-btn.primary:hover:not(:disabled) { background: #67e8f9; color: #000; }
+    .ctl-btn.ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-light);
+      color: var(--muted);
+    }
+    .ctl-btn.ghost:hover:not(:disabled) {
+      border-color: var(--cyan);
+      color: #fff;
+      background: rgba(34, 211, 238, 0.1);
+    }
+    .ctl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .deck-progress {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 0 4px;
+    }
+    .deck-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--violet), var(--cyan));
+      transition: width 0.2s linear;
+    }
+
+    .slide-counter-badge {
+      font-size: 0.74rem;
+      font-weight: 800;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .voice-toggle-label {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .voice-toggle-label input { position: absolute; opacity: 0; pointer-events: none; }
+    .voice-toggle-label:hover { border-color: var(--cyan); }
+    .voice-toggle-label input:checked + .v-icon { color: var(--cyan); filter: drop-shadow(0 0 6px var(--cyan)); }
+    .v-icon { font-size: 15px; }
+
+    /* ── Right Stage: Interactive Physics & Graphics ── */
+    .stage-panel {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #stage-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Floating Canvas HUD Overlays */
+    .stage-hud-top {
+      position: absolute;
+      top: 18px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(6, 14, 20, 0.85);
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      backdrop-filter: blur(10px);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #dcefff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .hud-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: hudPulse 1.8s infinite;
+    }
+    @keyframes hudPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+
+    .hud-controls-group {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-action-btn {
+      padding: 7px 14px;
+      border-radius: 14px;
+      background: rgba(168, 85, 247, 0.18);
+      border: 1px solid rgba(168, 85, 247, 0.45);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
+    .hud-action-btn:hover {
+      background: var(--violet);
+      color: #fff;
+      box-shadow: 0 0 16px var(--violet-glow);
+      transform: translateY(-1px);
+    }
+
+    .stage-hud-bottom {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      width: max-content;
+      max-width: min(560px, 88%);
+    }
+    .stage-scene-note {
+      pointer-events: none;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #a9c2d1;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      max-width: 100%;
+    }
+    .stage-caption-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 22px;
+      border-radius: 30px;
+      background: rgba(5, 12, 18, 0.92);
+      border: 1px solid rgba(34, 211, 238, 0.45);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      color: #edf6fa;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .stage-caption-pill .cap-icon { color: var(--violet); font-size: 1rem; }
+
+    .interactive-dock {
+      position: absolute;
+      bottom: 106px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    .stage-legend {
+      position: absolute;
+      bottom: 20px;
+      left: 24px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(5, 12, 18, 0.82);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      pointer-events: none;
+      max-width: 250px;
+    }
+    .stage-legend .legend-title {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .stage-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #e0eef5;
+      line-height: 1.2;
+    }
+    .stage-legend .legend-dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .stage-fade {
+      position: absolute;
+      inset: 0;
+      z-index: 9;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+    }
+  </style>
+</head>
+<body>
+
+<div id="cham-app">
+  <nav class="top-nav" id="top-nav" aria-label="Путь презентации"></nav>
+
+  <div class="main-workspace">
+
+    <aside class="deck-panel">
+      <div class="brand-header">
+        <div>
+          <div class="brand-title">🕸 Protocol <span>pivoting</span></div>
+          <div class="brand-subtitle">разбор статьи · доверие между ИИ-агентами и MCP · чек-лист для нас</div>
+        </div>
+        <button class="btn-presenter" id="btn-presenter" title="Открыть пульт докладчика">🖥 Пульт</button>
+      </div>
+
+      <div class="deck-scroll" id="deck-scroll"></div>
+
+      <div class="deck-controls">
+        <button id="btn-prev" class="ctl-btn ghost icon-only" aria-label="Назад" disabled>‹</button>
+        <button id="btn-play" class="ctl-btn primary">▶ Играть</button>
+        <button id="btn-restart" class="ctl-btn ghost icon-only" title="В начало">↺</button>
+        <div class="deck-progress"><div class="deck-progress-fill" id="progress-bar"></div></div>
+        <span class="slide-counter-badge" id="slide-counter">1 / 10</span>
+        <label class="voice-toggle-label" title="Озвучка (TTS)" aria-label="Голос">
+          <input type="checkbox" id="voice-toggle">
+          <span class="v-icon">🗣️</span>
+        </label>
+        <select id="vpick-select" title="Голос докладчика" aria-label="Голос докладчика" style="height:32px;border:1px solid #30363d;border-radius:7px;background:#0d1117;color:#c9d1d9;padding:0 8px;font:inherit;font-size:.8rem;cursor:pointer;max-width:160px;">
+          <option value="edge:ru-RU-DmitryNeural">🤖 Стандартный</option>
+          <option value="elevenlabs:mine">🎙 Мой голос</option>
+        </select>
+        <script>window.__voiceSlug=function(v){v=String(v||'');return v.indexOf('elevenlabs')===0?'mine':'edge';};</script>
+<script>(function(){var K='presentationVoiceChoice',D='elevenlabs:mine',s=document.getElementById('vpick-select');var v=localStorage.getItem(K);if(!v){v=D;localStorage.setItem(K,D);}s.value=[].some.call(s.options,function(o){return o.value===v})?v:D;s.addEventListener('change',function(){localStorage.setItem(K,s.value||D);});})();</script>
+        <button id="btn-next" class="ctl-btn ghost">Далее ›</button>
+      </div>
+    </aside>
+
+    <main class="stage-panel">
+      <canvas id="stage-canvas"></canvas>
+      <div class="stage-fade" id="stage-fade"></div>
+      <div class="stage-legend" id="stage-legend"></div>
+
+      <div class="stage-hud-top">
+        <div class="hud-pill">
+          <span class="hud-dot" id="hud-status-dot"></span>
+          <span id="hud-status-text">Agent Security Lab · 60 FPS</span>
+        </div>
+        <div class="hud-controls-group" id="hud-actions"></div>
+      </div>
+
+      <div class="interactive-dock" id="interactive-dock"></div>
+
+      <div class="stage-hud-bottom">
+        <div class="stage-caption-pill">
+          <span class="cap-icon">✦</span>
+          <span id="stage-caption-text">Инициализация…</span>
+        </div>
+        <div class="stage-scene-note" id="stage-scene-note"></div>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script src="mqtt.min.js"></script>
+<script src="preza-sync.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COLORS
+  // ═══════════════════════════════════════════════════════════════════════════
+  const CY = '#22d3ee', EM = '#10b981', RED = '#ef4444', AMB = '#f59e0b',
+        VIO = '#a855f7', BLUE = '#3b82f6', MAG = '#ec4899', MUT = '#64748b';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SLIDES DATA
+  // ═══════════════════════════════════════════════════════════════════════════
+  const slidesData = [
+    {
+      icon: '🕸', tag: 'Разбор статьи · безопасность ИИ-агентов', tagColor: RED, storyLabel: 'Суть', mode: 'pp_intro',
+      caption: 'Достаточно взломать одного ИИ-агента — остальные в группе выполнят его указания',
+      sceneNote: 'Шесть агентов доверяют друг другу. Один заражён — и заражение идёт по связям доверия.',
+      title: 'Protocol pivoting: агенты доверяют друг другу',
+      desc: `Проблема <strong>не в моделях, а в архитектуре</strong>. Атака не зависит от LLM и обвязки: агенты по умолчанию <span class="hl-red">полностью доверяют друг другу</span>, и достаточно скомпрометировать одного. Нашёл её независимый исследователь Сайед Анас Мохиуддин; подтвердилась в <span class="hl-amber">пяти организациях, включая Google, за пять месяцев</span>. Общее у них — агенты на <span class="hl-cyan">MCP</span>.`,
+      callout: `<b>Коротко:</b> дело не в чьей-то ошибке, а в модели доверия протокола — поэтому схема повторилась там, где больше ничего общего нет.`,
+      calloutClass: 'red'
+    },
+    {
+      icon: '🎯', tag: 'Механика атаки', tagColor: AMB, storyLabel: 'Механика', mode: 'pp_mech',
+      caption: 'Модель отказала бы — а агент выполнит: цель атаки агент с узкой задачей, а не LLM',
+      sceneNote: 'Прямой запрос модель блокирует. Через взломанного агента A тот же запрос доходит до цели.',
+      title: 'Модель отказала бы — агент выполнит',
+      desc: `Вредоносная подсказка бьёт по <strong>конкретному агенту</strong> с узкой задачей — например, по агенту для перевода. Он взломан через <span class="hl-red">prompt injection</span>. Агенты B, C… доверяют ему <strong>на уровне архитектуры</strong> и выполняют указания — даже то, что модель отклонила бы. Учётные данные всей группы лежат на <span class="hl-amber">MCP-сервере</span>.`,
+      callout: `<b>Итог:</b> фильтры модели работают на входе одного агента, а между агентами проверки нет.`,
+      calloutClass: 'amber'
+    },
+    {
+      icon: '🔀', tag: 'Protocol pivoting', tagColor: CY, storyLabel: 'Pivoting', mode: 'pp_pivot',
+      caption: 'Вход через один протокол — действие через другой: на стыке авторизация и доверие теряются',
+      sceneNote: 'Ключ авторизации есть на входе (MCP) и пропадает на стыке. Но агент всё равно действует во втором протоколе.',
+      title: 'Вход через MCP — действие через A2A',
+      desc: `<span class="hl-cyan">Вход · MCP:</span> приложение или сервер ставит задачу агенту — так злоумышленник попадает внутрь. <span class="hl-amber">Выход · A2A или Agent Network Protocol:</span> агент пересылает инструкции другим агентам и, считая, что между протоколами есть доверие, пользуется возможностями, доступными только там. <strong>Авторизация при передаче теряется.</strong>`,
+      callout: `<b>Это и есть pivoting:</b> вошли через один протокол, действуем через другой.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '🙈', tag: 'Почему не заметно', tagColor: VIO, storyLabel: 'Не видно', mode: 'pp_chain',
+      caption: 'Каждый шаг выглядит штатно — аномалия видна только в цепочке целиком',
+      sceneNote: 'Входы всех агентов проверены (зелёное), а связи между ними — серые, за ними никто не следит.',
+      title: 'Каждый шаг штатный — аномалия в цепочке',
+      desc: `Протокол создавался в расчёте на автономность, поэтому <span class="hl-emerald">проверяется внешняя точка входа каждого агента</span>. А вот <span class="hl-red">цепочка взаимодействия между агентами — не проверяется</span>: за ней никто не следит. Каждый агент делает то, для чего создан, и по отдельности всё выглядит нормально.`,
+      callout: `<b>Отсюда слепое пятно:</b> сканеры зависимостей этого не видят — опасный ввод приходит как аргумент инструмента по транспорту.`,
+      calloutClass: 'violet'
+    },
+    {
+      icon: '🧨', tag: 'Реальные кейсы · пять организаций', tagColor: RED, storyLabel: 'Пять кейсов', mode: 'pp_cases',
+      caption: 'Одна и та же ошибка в пяти местах: адрес из аргумента инструмента никто не проверил',
+      sceneNote: 'Пять независимых организаций. Красная плашка внизу — общий корень всех пяти случаев.',
+      title: 'Пять кейсов — одна и та же ошибка',
+      desc: `<strong>Google</strong> (CVE-2026-14540, CVSS 8,0): клиент без политики редиректов и без проверки IP — запрос уходил на внутренний адрес. <strong>JPMorgan:</strong> у одного инструмента allowlist, у соседнего его нет. <strong>Weaviate:</strong> endpoint решал, куда слать запросы. <strong>DINUM:</strong> DNS rebinding и метаданные облака. <strong>Тангеранг:</strong> проверяли только IP, домены не резолвили.`,
+      callout: `<b>Общий корень:</b> адрес приходит как аргумент инструмента, и его не проверяют в момент соединения. Это один из способов получить привилегированный исходящий запрос.`,
+      calloutClass: 'red'
+    },
+    {
+      icon: '🛡', tag: 'Что делать', tagColor: EM, storyLabel: 'Защита', mode: 'pp_defense',
+      caption: 'Три правила автора и четыре практики из его разбора кейсов: нулевое доверие и между агентами',
+      sceneNote: 'Три главные карточки — выводы статьи. Нижний ряд — практики из разбора кейсов на странице исследователя.',
+      title: 'Нулевое доверие — и между агентами',
+      desc: `<span class="hl-emerald">Авторизация едет с задачей</span> и права передаются явно на каждом переходе. <span class="hl-cyan">Egress-контроль:</span> проверять IP <strong>после резолва, в момент соединения</strong>, редиректы — по каждому шагу, один allowlist на <strong>каждый</strong> инструмент, который ходит по URL. <span class="hl-violet">Наблюдаемость:</span> трассировка всей цепочки; тела ответов в логи — только с маскировкой.`,
+      callout: `<b>От себя:</b> закрыть адрес metadata облака (169.254.169.254), давать агенту минимум прав и спрашивать про каждый аргумент инструмента: «кто им управляет?»`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '✅', tag: 'Как мы · чек-лист', tagColor: BLUE, storyLabel: 'У нас', mode: 'pp_ours',
+      caption: 'Пять проверок для наших агентов: Simulator MCP, Corezoid, Jira',
+      sceneNote: 'Это чек-лист, а не утверждение об уязвимости: каждый пункт нужно проверить на нашей конфигурации.',
+      title: 'Как мы можем: чек-лист для наших агентов',
+      desc: `Агенты у нас ходят в <span class="hl-cyan">Simulator, Corezoid и Jira</span> — это те же MCP-инструменты. Проверить: <strong>права токенов</strong> минимальные · <strong>запись и удаление</strong> только через ✋ · параметры <strong>из агента в URL и путь</strong> проверяются · исходящие вызовы Corezoid ограничены allowlist · есть <strong>сквозной лог</strong> «кто → кого → что».`,
+      callout: `<b>Честно:</b> мы не утверждаем, что у нас есть дыра. Это точка входа для ревью — на пилоте одного сценария.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '⚖️', tag: 'Оговорки и вывод', tagColor: AMB, storyLabel: 'Оговорки', mode: 'pp_end',
+      caption: 'Кейсы подтверждены первоисточником; в пересказе есть неточность про оценку 2,7',
+      sceneNote: 'Слева — что подтверждает материал. Справа — оговорки автора разбора. Внизу — вывод.',
+      title: 'Оговорки и вывод',
+      desc: `<span class="hl-amber">Заголовок преувеличивает:</span> речь о типовых конфигурациях MCP, а не обо «всех агентах». Материал 3DNews от 06.10.2026 — <strong>пересказ Ars Technica</strong>. Мы сверили кейсы со страницей исследователя: они подтверждаются, но <span class="hl-red">CVE-2026-97228 (Rapid7, 2,7) — это не SSRF, а инъекция в GraphQL</span>, так что сравнивать её с 8,0 у Google некорректно.`,
+      callout: `<b>Вывод:</b> агент в цепочке — не «свой», а недоверенный узел. Права и проверки — на каждом переходе.`,
+      calloutClass: 'amber'
+    }
+  ];
+
+  // Пульт-only подсказки докладчику (не входят в озвучку).
+  const PRESENTER_TIPS = [
+    'Сцена: шесть агентов с узкими задачами, все связаны линиями доверия. Кнопка <b>«☠ Заразить»</b> запускает заражение: сначала один агент красный, потом цепочка. Три цифры внизу: пять организаций, пять месяцев, один общий признак — MCP. Мысль: дело в архитектуре, а не в модели.',
+    'Кнопка <b>«▶ Атака»</b>: сначала прямой запрос к модели — она отказывает (✋). Затем тот же запрос через взломанного агента A — доходит до агентов B и C и до внутренней сети. Подчеркни: цель атаки — агент с узкой задачей, а не LLM.',
+    'Кнопка <b>«▶ Прогнать»</b>: на входе (MCP) у задачи есть ключ авторизации. На стыке протоколов ключ пропадает, но агент во втором протоколе (A2A / Agent Network Protocol) всё равно действует. Это и есть pivoting.',
+    'Кнопка <b>«🔍 Показать цепочку»</b>: сначала у каждого агента зелёная галочка «вход проверен», связи между ними серые. После нажатия видна красная цепочка целиком. Мысль: проверяют точки входа, а не путь задачи.',
+    'Кнопка <b>«➡ Следующий кейс»</b> подсвечивает пять организаций: Google, JPMorgan, Weaviate, DINUM, Тангеранг. Для Google назови CVE-2026-14540 и 8,0, а исправление — проверка адресов при соединении (против DNS rebinding) плюс allow- и blocklist. Красная плашка — общий корень всех пяти.',
+    'Три крупные карточки — выводы автора статьи, нижний ряд — практики из его разбора кейсов (проверка IP при соединении, редиректы по шагам, один allowlist на все инструменты, маскировка логов).',
+    'Кнопка <b>«✔ Пройти чек-лист»</b> по очереди отмечает пять проверок. Обязательно скажи: это не утверждение, что у нас есть уязвимость, а список, что проверить на пилоте. Особенно Corezoid: исходящие вызовы и параметры из агента в URL.',
+    'Финал: слева что материал подтверждает, справа оговорки. Скажи про неточность пересказа: CVE-2026-97228 (Rapid7, 2,7) — не SSRF, а GraphQL-инъекция; сравнение с 8,0 некорректно. Остальное сверено с первоисточником. Закрой мыслью: агент в цепочке — недоверенный узел.'
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CANVAS ENGINE
+  // ═══════════════════════════════════════════════════════════════════════════
+  const canvas = document.getElementById('stage-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Projector readability: enlarge EVERY on-canvas label uniformly.
+  const FONT_SCALE = 1.35;
+  const _fontDesc = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'font');
+  Object.defineProperty(ctx, 'font', {
+    configurable: true,
+    get() { return _fontDesc.get.call(this); },
+    set(v) {
+      _fontDesc.set.call(this, String(v).replace(/(\d+(?:\.\d+)?)px/, (m, n) => (parseFloat(n) * FONT_SCALE).toFixed(1) + 'px'));
+    }
+  });
+
+  let width = 0, height = 0, dpr = 1;
+  function resizeCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    width = rect.width; height = rect.height;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.resetTransform && ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  let currentSlide = 0;
+  let animTime = 0;
+  let shockwaves = [];
+  let sparks = [];
+  let customState = {};
+
+  function addSparks(x, y, color, count = 16, maxSpeed = 5) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * maxSpeed;
+      sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 1.0, decay: 0.02 + Math.random() * 0.03, color, size: 2 + Math.random() * 3 });
+    }
+  }
+  function addShockwave(x, y, color, maxRadius = 80) {
+    shockwaves.push({ x, y, radius: 5, maxRadius, life: 1.0, decay: 0.03, color });
+  }
+
+  // ── Shared draw helpers ──
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function box(x, y, w, h, color, title, sub, opts) {
+    opts = opts || {};
+    ctx.save();
+    rr(x, y, w, h, opts.radius || 12);
+    ctx.fillStyle = opts.bg || 'rgba(8,16,24,0.88)';
+    ctx.fill();
+    ctx.lineWidth = opts.lw || 2;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color; ctx.shadowBlur = opts.glow != null ? opts.glow : 14;
+    ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (title) {
+      ctx.fillStyle = '#fff'; ctx.font = '700 15px Inter';
+      ctx.fillText(title, x + w / 2, y + h / 2 - (sub ? 9 : 0));
+    }
+    if (sub) { ctx.fillStyle = color; ctx.font = '700 12px JetBrains Mono'; ctx.fillText(sub, x + w / 2, y + h / 2 + 11); }
+    ctx.restore();
+  }
+  function line(x1, y1, x2, y2, color, w, dash) {
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = w || 2;
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.restore();
+  }
+  function flowDots(x1, y1, x2, y2, color, speed, count, size) {
+    for (let i = 0; i < count; i++) {
+      const t = ((animTime * speed + i / count) % 1);
+      const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
+      ctx.save();
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
+      ctx.globalAlpha = 0.35 + 0.5 * Math.sin(t * Math.PI);
+      ctx.beginPath(); ctx.arc(x, y, size || 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  function label(txt, x, y, color, size, weight, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = (weight || 700) + ' ' + (size || 13) + 'px Inter';
+    ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+  function mono(txt, x, y, color, size, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = '700 ' + (size || 13) + 'px JetBrains Mono';
+    ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+  // horizontal progress/score bar
+  function bar(x, y, w, h, frac, color) {
+    ctx.save();
+    rr(x, y, w, h, h / 2); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
+    if (frac > 0) {
+      rr(x, y, Math.max(h, w * Math.min(1, frac)), h, h / 2);
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill();
+    }
+    ctx.restore();
+  }
+  // greedy word-wrap, centered on x; returns number of lines drawn
+  function wrap(txt, x, y, maxW, lh, color, size, weight, align) {
+    ctx.save();
+    ctx.font = (weight || 700) + ' ' + (size || 12) + 'px Inter';
+    const words = String(txt).split(' '); const rows = []; let cur = '';
+    words.forEach(w => {
+      const test = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && cur) { rows.push(cur); cur = w; } else cur = test;
+    });
+    if (cur) rows.push(cur);
+    ctx.restore();
+    rows.forEach((r, i) => label(r, x, y + i * lh, color, size, weight, align));
+    return rows.length;
+  }
+  function hub(x, y, r, color, icon, title, sub) {
+    const pulse = 0.5 + 0.5 * Math.sin(animTime * 2.2);
+    ctx.save();
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.25 + 0.2 * pulse; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, r + 12 + pulse * 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    box(x - r, y - r * 0.8, r * 2, r * 1.6, color, '', '', { glow: 20 });
+    label(icon, x, y - r * 0.2, '#fff', 26);
+    label(title, x, y + r * 0.35, color, 13, 800);
+    if (sub) label(sub, x, y + r * 0.62, '#9fb2bf', 10, 700);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCENE DATA
+  // ═══════════════════════════════════════════════════════════════════════════
+  const AGENTS = ['Перевод', 'Поиск', 'Код', 'Почта', 'База данных', 'Календарь'];
+  const CASES = [
+    { org: 'Google', tag: 'CVE-2026-14540 · CVSS 8,0', what: 'MCP Toolbox for Databases: клиент без политики редиректов и без проверки IP — запрос уходил на внутренний адрес', color: RED },
+    { org: 'JPMorgan Chase', tag: 'средняя', what: 'У одного инструмента allowlist доменов, соседний скачивал любой URL без проверки', color: AMB },
+    { org: 'Weaviate', tag: 'endpoint', what: 'Настраиваемый endpoint решал, куда сервер шлёт запросы; исправили ограничением хостами Google API', color: VIO },
+    { org: 'DINUM · Франция', tag: 'data.gouv.fr', what: 'URL из данных уязвим к DNS rebinding, доступ к метаданным облака', color: BLUE },
+    { org: 'Тангеранг · Индонезия', tag: 'Wazuh MCP', what: 'Защита отбрасывала только IP-адреса, домены не резолвила — любой домен проходил внутрь', color: MAG }
+  ];
+  const RULES = [
+    { icon: '🔑', t: 'Авторизация едет с задачей', s: 'права передаются явно на каждом переходе, а не выводятся из «свой агент»', color: EM },
+    { icon: '🚪', t: 'Egress-контроль на инструмент', s: 'allowlist IP, явная политика редиректов, внутренняя сеть закрыта', color: CY },
+    { icon: '🔭', t: 'Наблюдаемость цепочки', s: 'трассировка от входа до последнего агента, а не только входа', color: VIO }
+  ];
+  const EXTRAS = [
+    ['🧬', 'IP — после резолва, при соединении'],
+    ['↪️', 'редиректы — проверять каждый шаг'],
+    ['📋', 'один allowlist на все инструменты'],
+    ['🧽', 'логи — без сырых ответов']
+  ];
+  const CHECKS = [
+    { icon: '🔑', t: 'Права токенов агентов — минимум', s: 'Simulator · Corezoid · Jira: read-only по умолчанию', color: EM },
+    { icon: '✋', t: 'Запись и удаление — только через подтверждение', s: 'человек подтверждает опасное действие', color: AMB },
+    { icon: '🧾', t: 'Аргумент из агента в URL или путь — проверка', s: 'кто управляет значением и что вернётся', color: CY },
+    { icon: '🚪', t: 'Исходящие вызовы Corezoid — allowlist', s: 'внутренняя сеть и metadata закрыты', color: BLUE },
+    { icon: '🔭', t: 'Сквозной лог: кто → кого → что', s: 'трассировка всей цепочки задачи', color: VIO }
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCENE INITIALIZATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  function initScene(slideIndex) {
+    shockwaves = []; sparks = []; customState = {};
+    const mode = slidesData[slideIndex].mode;
+    if (mode === 'pp_intro') customState.inf = 0;
+    else if (mode === 'pp_mech') customState.t = 0;
+    else if (mode === 'pp_pivot') customState.t = 0;
+    else if (mode === 'pp_chain') customState.show = 0;
+    else if (mode === 'pp_cases') { customState.act = 0; customState.tm = 0; }
+    else if (mode === 'pp_defense') customState.d = 0;
+    else if (mode === 'pp_ours') customState.ck = 0;
+    renderHUDControls(slideIndex);
+  }
+
+  function renderHUDControls(slideIndex) {
+    const hudGroup = document.getElementById('hud-actions');
+    const dockGroup = document.getElementById('interactive-dock');
+    hudGroup.innerHTML = ''; dockGroup.innerHTML = '';
+    const mode = slidesData[slideIndex].mode;
+    const hudBtn = (html, onclick) => {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn'; b.innerHTML = html; b.onclick = onclick;
+      hudGroup.appendChild(b);
+    };
+    if (mode === 'pp_intro') hudBtn('☠ Заразить', () => { customState.inf = 0; });
+    else if (mode === 'pp_mech') hudBtn('▶ Атака', () => { customState.t = 0; customState._b = false; customState._d = false; });
+    else if (mode === 'pp_pivot') hudBtn('▶ Прогнать', () => { customState.t = 0; customState._d = false; });
+    else if (mode === 'pp_chain') hudBtn('🔍 Показать цепочку', () => { customState.show = 0; });
+    else if (mode === 'pp_cases') hudBtn('➡ Следующий кейс', () => { customState.act = (customState.act + 1) % CASES.length; customState.tm = 0; });
+    else if (mode === 'pp_defense') hudBtn('↺ Заново', () => { customState.d = 0; });
+    else if (mode === 'pp_ours') hudBtn('✔ Пройти чек-лист', () => { customState.ck = 0; });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN LOOP
+  // ═══════════════════════════════════════════════════════════════════════════
+  const RENDERERS = {
+    pp_intro: renderMesh, pp_mech: renderMech, pp_pivot: renderPivot, pp_chain: renderChain,
+    pp_cases: renderCases, pp_defense: renderDefense, pp_ours: renderOurs, pp_end: renderEnd
+  };
+  function animate() {
+    requestAnimationFrame(animate);
+    if (document.hidden) return; // pause heavy canvas work when tab/window not visible
+    animTime += 0.016;
+    ctx.clearRect(0, 0, width, height);
+    drawBackgroundGrid();
+    const fn = RENDERERS[slidesData[currentSlide].mode];
+    if (fn) fn();
+    renderEffects();
+  }
+
+  function drawBackgroundGrid() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.05)';
+    ctx.lineWidth = 1;
+    const step = 44;
+    for (let x = 0; x < width; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+    for (let y = 0; y < height; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+    ctx.restore();
+  }
+  function lerp(a, b, t) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
+  function dot(x, y, color, r) {
+    ctx.save(); ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(x, y, r || 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+
+  // ── Scene 1: trust mesh, infection ──
+  function renderMesh() {
+    customState.inf = Math.min(AGENTS.length + 0.5, (customState.inf || 0) + 0.011);
+    const cx = width * 0.5, cy = height * 0.47, R = Math.min(width * 0.27, height * 0.26);
+    const pts = AGENTS.map((_, i) => {
+      const a = -Math.PI / 2 + i / AGENTS.length * Math.PI * 2;
+      return { x: cx + Math.cos(a) * R * 1.25, y: cy + Math.sin(a) * R };
+    });
+    const n = Math.floor(customState.inf);
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+      const bad = i < n && j < n;
+      line(pts[i].x, pts[i].y, pts[j].x, pts[j].y, bad ? 'rgba(239,68,68,0.5)' : 'rgba(148,163,184,0.16)', bad ? 1.6 : 1);
+    }
+    pts.forEach((p, i) => {
+      const bad = i < n;
+      if (bad && !customState['_s' + i]) { customState['_s' + i] = true; addShockwave(p.x, p.y, RED, 60); }
+      box(p.x - 62, p.y - 30, 124, 60, bad ? RED : CY, '', '', { glow: bad ? 16 : 8, bg: bad ? 'rgba(24,6,8,0.95)' : 'rgba(8,16,24,0.9)' });
+      label(bad ? '☠' : '🤖', p.x, p.y - 8, '#fff', 20);
+      label(AGENTS[i], p.x, p.y + 15, bad ? '#fecaca' : '#cdd8e0', 10.5, 800);
+    });
+    label('🔗 доверие по умолчанию', cx, cy - 6, MUT, 11.5, 800);
+    label(n >= 6 ? 'скомпрометирована вся группа' : 'заражено: ' + n + ' из ' + AGENTS.length, cx, cy + 16, n ? RED : EM, 12, 800);
+    [['5', 'организаций', AMB], ['5', 'месяцев', CY], ['1', 'общее — MCP', VIO]].forEach((c, i) => {
+      const w = 190, x = width / 2 - (w * 3 + 24) / 2 + i * (w + 12), y = height * 0.82;
+      box(x, y, w, 48, c[2], '', '', { glow: 8 });
+      label(c[0], x + 30, y + 24, c[2], 20, 900);
+      label(c[1], x + 112, y + 24, '#fff', 11, 800);
+    });
+    label('один скомпрометирован — остальные выполняют его указания', width / 2, height * 0.06, RED, 13, 800);
+  }
+
+  // ── Scene 2: mechanics ──
+  function renderMech() {
+    customState.t = Math.min(3.4, (customState.t || 0) + 0.006);
+    const t = customState.t;
+    const P = {
+      atk: { x: width * 0.09, y: height * 0.46 }, llm: { x: width * 0.46, y: height * 0.17 },
+      A: { x: width * 0.30, y: height * 0.66 }, B: { x: width * 0.58, y: height * 0.50 },
+      C: { x: width * 0.58, y: height * 0.80 }, net: { x: width * 0.88, y: height * 0.66 }
+    };
+    line(P.atk.x, P.atk.y, P.llm.x, P.llm.y, 'rgba(148,163,184,0.25)', 1.5, [5, 5]);
+    line(P.atk.x, P.atk.y, P.A.x, P.A.y, 'rgba(239,68,68,0.35)', 2);
+    line(P.A.x, P.A.y, P.B.x, P.B.y, 'rgba(245,158,11,0.35)', 2);
+    line(P.A.x, P.A.y, P.C.x, P.C.y, 'rgba(245,158,11,0.35)', 2);
+    line(P.B.x, P.B.y, P.net.x, P.net.y, 'rgba(239,68,68,0.35)', 2);
+    line(P.C.x, P.C.y, P.net.x, P.net.y, 'rgba(239,68,68,0.35)', 2);
+
+    // phase 1: direct → LLM, refused
+    if (t < 1.0) dot(lerp(P.atk.x, P.llm.x, t), lerp(P.atk.y, P.llm.y, t), RED);
+    else if (t < 1.4) dot(lerp(P.llm.x, P.atk.x, (t - 1.0) / 0.4), lerp(P.llm.y, P.atk.y, (t - 1.0) / 0.4), MUT, 5);
+    if (t >= 1.0 && !customState._b) { customState._b = true; addShockwave(P.llm.x, P.llm.y, RED, 70); }
+    // phase 2: via agents
+    if (t >= 1.4 && t < 2.1) dot(lerp(P.atk.x, P.A.x, (t - 1.4) / 0.7), lerp(P.atk.y, P.A.y, (t - 1.4) / 0.7), RED);
+    if (t >= 2.1 && t < 2.8) {
+      const f = (t - 2.1) / 0.7;
+      dot(lerp(P.A.x, P.B.x, f), lerp(P.A.y, P.B.y, f), AMB); dot(lerp(P.A.x, P.C.x, f), lerp(P.A.y, P.C.y, f), AMB);
+    }
+    if (t >= 2.8 && t < 3.4) {
+      const f = (t - 2.8) / 0.6;
+      dot(lerp(P.B.x, P.net.x, f), lerp(P.B.y, P.net.y, f), RED); dot(lerp(P.C.x, P.net.x, f), lerp(P.C.y, P.net.y, f), RED);
+    }
+    if (t >= 3.4 && !customState._d) { customState._d = true; addShockwave(P.net.x, P.net.y, RED, 90); addSparks(P.net.x, P.net.y, RED, 20, 5); }
+
+    box(P.atk.x - 58, P.atk.y - 38, 116, 76, RED, '', '', { glow: 14, bg: 'rgba(18,6,8,0.92)' });
+    label('😈', P.atk.x, P.atk.y - 8, '#fff', 24); label('Внешний ввод', P.atk.x, P.atk.y + 18, RED, 10.5, 800);
+    box(P.llm.x - 70, P.llm.y - 34, 140, 68, t >= 1.0 ? EM : VIO, '', '', { glow: 14 });
+    label('🧠', P.llm.x, P.llm.y - 8, '#fff', 22); label('LLM · фильтры', P.llm.x, P.llm.y + 16, '#fff', 10.5, 800);
+    if (t >= 1.0 && t < 2.4) label('✋ отказ', P.llm.x + 100, P.llm.y, EM, 13, 800, 'left');
+    const agent = (p, nm, c, ic) => { box(p.x - 62, p.y - 32, 124, 64, c, '', '', { glow: 12 }); label(ic, p.x, p.y - 9, '#fff', 20); label(nm, p.x, p.y + 16, c, 10.5, 800); };
+    agent(P.A, 'Агент A', t >= 1.9 ? RED : AMB, t >= 1.9 ? '☠' : '🤖');
+    agent(P.B, 'Агент B', t >= 2.4 ? RED : CY, '🤖'); agent(P.C, 'Агент C', t >= 2.4 ? RED : CY, '🤖');
+    box(P.net.x - 66, P.net.y - 36, 132, 72, t >= 3.0 ? RED : '#334155', '', '', { glow: t >= 3.0 ? 16 : 4 });
+    label('🏢', P.net.x, P.net.y - 8, '#fff', 22); label('внутр. сеть', P.net.x, P.net.y + 17, '#fff', 10, 800);
+    label('prompt injection', (P.atk.x + P.A.x) / 2 - 20, (P.atk.y + P.A.y) / 2 + 22, RED, 10, 800);
+    label('доверие', (P.A.x + P.B.x) / 2 + 6, (P.A.y + P.B.y) / 2 - 18, AMB, 10, 800);
+    label(t < 1.4 ? 'прямой запрос — модель отказывает' : 'тот же запрос через доверенного агента — выполняется', width / 2, height * 0.07, t < 1.4 ? EM : RED, 13, 800);
+  }
+
+  // ── Scene 3: protocol pivot ──
+  function renderPivot() {
+    customState.t = Math.min(2.2, (customState.t || 0) + 0.0055);
+    const t = customState.t, y1 = height * 0.30, y2 = height * 0.66;
+    const xS = width * 0.12, xA = width * 0.46, xB = width * 0.82;
+    label('ВХОД · MCP', width * 0.12, y1 - 62, CY, 12, 900, 'left');
+    label('ВЫХОД · A2A · Agent Network Protocol', xA + 90, y2 - 70, AMB, 12, 900, 'left');
+    line(xS + 56, y1, xA - 56, y1, 'rgba(34,211,238,0.5)', 3);
+    line(xA + 56, y2, xB - 56, y2, 'rgba(245,158,11,0.5)', 3);
+    line(xA, y1 + 40, xA, y2 - 40, 'rgba(148,163,184,0.25)', 2, [5, 5]);
+    box(xS - 56, y1 - 38, 112, 76, RED, '', '', { glow: 12, bg: 'rgba(18,6,8,0.92)' });
+    label('📱', xS, y1 - 8, '#fff', 22); label('приложение', xS, y1 + 18, RED, 10, 800);
+    box(xA - 62, y1 - 42, 124, y2 - y1 + 84, VIO, '', '', { glow: 16 });
+    label('🤖', xA, (y1 + y2) / 2 - 12, '#fff', 28); label('Агент', xA, (y1 + y2) / 2 + 16, VIO, 13, 800);
+    box(xB - 56, y2 - 38, 112, 76, t > 1.5 ? RED : AMB, '', '', { glow: 12 });
+    label('🤖', xB, y2 - 8, '#fff', 22); label('другой агент', xB, y2 + 18, '#fff', 10.5, 800);
+    // token
+    let tx, ty, lab = '', lc = EM;
+    if (t < 0.9) { const f = t / 0.9; tx = lerp(xS + 56, xA - 56, f); ty = y1; lab = '🔑 авторизация'; lc = EM; }
+    else if (t < 1.2) { tx = xA; ty = lerp(y1, y2, (t - 0.9) / 0.3); lab = '🔑 → ?'; lc = AMB; }
+    else { const f = Math.min(1, (t - 1.2) / 1.0); tx = lerp(xA + 56, xB - 56, f); ty = y2; lab = 'без проверки'; lc = RED; }
+    dot(tx, ty, t < 0.9 ? CY : (t < 1.2 ? AMB : RED));
+    label(lab, tx - (t >= 1.2 ? 70 : 0), ty - (t >= 1.2 ? 34 : 22), lc, 11, 800);
+    if (t >= 0.9 && t < 1.25) label('✂ авторизация теряется', xA + 100, (y1 + y2) / 2, RED, 12, 800, 'left');
+    if (t >= 2.2 && !customState._d) { customState._d = true; addShockwave(xB, y2, RED, 80); addSparks(xB, y2, RED, 16, 4); }
+    label('вход через один протокол — действие через другой', width / 2, height * 0.08, CY, 13, 800);
+    label(t < 1.2 ? 'на входе задача авторизована' : 'во втором протоколе агент действует так, будто доверие уже есть', width / 2, height * 0.80, t < 1.2 ? EM : RED, 12.5, 800);
+  }
+
+  // ── Scene 4: chain visibility ──
+  function renderChain() {
+    customState.show = Math.min(1.2, (customState.show || 0) + 0.0025);
+    const s = customState.show;
+    const names = [['😈', 'Вход'], ['🤖', 'Агент A'], ['🤖', 'Агент B'], ['🤖', 'Агент C'], ['🛠', 'Инструмент']];
+    const y = height * 0.42, xs = names.map((_, i) => width * (0.10 + i * 0.2));
+    for (let i = 0; i < 4; i++) {
+      const bad = s > i * 0.22 + 0.1;
+      line(xs[i] + 56, y, xs[i + 1] - 56, y, bad ? 'rgba(239,68,68,0.85)' : 'rgba(148,163,184,0.3)', bad ? 3 : 1.5, bad ? null : [5, 6]);
+      if (!bad) label('?', (xs[i] + xs[i + 1]) / 2, y - 16, MUT, 15, 900);
+      else flowDots(xs[i] + 56, y, xs[i + 1] - 56, y, RED, 0.5, 2, 3);
+    }
+    names.forEach((n, i) => {
+      box(xs[i] - 56, y - 38, 112, 76, i === 0 ? RED : EM, '', '', { glow: 8 });
+      label(n[0], xs[i], y - 10, '#fff', 22); label(n[1], xs[i], y + 18, '#fff', 11, 800);
+      if (i > 0) { label('✓ вход проверен', xs[i], y + 62, EM, 9.5, 800); }
+    });
+    const full = s >= 1.0;
+    box(width * 0.5 - 300, height * 0.68, 600, 60, full ? RED : VIO, '', '', { glow: 14, bg: full ? 'rgba(24,6,8,0.92)' : 'rgba(10,8,18,0.92)' });
+    label(full ? 'вся цепочка видна — и она вредоносная' : 'каждый шаг по отдельности выглядит штатно', width / 2, height * 0.68 + 30, full ? '#fecaca' : '#e2ccfb', 13, 800);
+    label('проверяют входы агентов, а не путь задачи между ними', width / 2, height * 0.08, VIO, 13, 800);
+    label('зелёное — проверяется · серое — никто не следит', width / 2, height * 0.86, MUT, 11.5, 700);
+  }
+
+  // ── Scene 5: five cases ──
+  function renderCases() {
+    customState.tm = (customState.tm || 0) + 0.016;
+    if (customState.tm > 3.4) { customState.tm = 0; customState.act = (customState.act + 1) % CASES.length; }
+    const x0 = width * 0.05, w = width * 0.9, y0 = height * 0.14, rh = height * 0.10, gap = 7;
+    CASES.forEach((c, i) => {
+      const on = i === customState.act, y = y0 + i * (rh + gap);
+      box(x0, y, w, rh, on ? c.color : '#334155', '', '', { glow: on ? 14 : 2, bg: on ? 'rgba(10,14,22,0.96)' : 'rgba(8,12,18,0.85)' });
+      label(c.org, x0 + 18, y + rh * 0.36, on ? '#fff' : '#9fb2bf', 13, 900, 'left');
+      label(c.tag, x0 + 18, y + rh * 0.72, on ? c.color : '#64748b', 9.5, 800, 'left');
+      ctx.save(); ctx.font = '700 11px Inter'; ctx.restore();
+      wrap(c.what, x0 + w * 0.60, y + rh / 2 - (on ? 7 : 0), w * 0.56, 15, on ? '#e6eef3' : '#7f97a6', 10.5, 700);
+    });
+    const by = y0 + 5 * (rh + gap) + 6;
+    box(x0, by, w, 46, RED, '', '', { glow: 12, bg: 'rgba(24,6,8,0.92)' });
+    label('общий корень: адрес из аргумента инструмента не проверен в момент соединения', width / 2, by + 23, '#fecaca', 12.5, 800);
+    label('пять независимых организаций · источник — страница исследователя', width / 2, height * 0.07, RED, 12.5, 800);
+  }
+
+  // ── Scene 6: defense ──
+  function renderDefense() {
+    customState.d = (customState.d || 0) + 0.012;
+    const d = customState.d;
+    const cw = Math.min(250, width * 0.28), gap = 18, x0 = width / 2 - (cw * 3 + gap * 2) / 2, y0 = height * 0.17, ch = height * 0.31;
+    RULES.forEach((r, i) => {
+      const ap = Math.max(0, Math.min(1, d - i * 0.4)); if (ap <= 0) return;
+      const x = x0 + i * (cw + gap);
+      ctx.save(); ctx.globalAlpha = ap;
+      box(x, y0, cw, ch, r.color, '', '', { glow: 12, bg: 'rgba(6,12,18,0.94)' });
+      label(r.icon, x + cw / 2, y0 + 40, '#fff', 30);
+      wrap(r.t, x + cw / 2, y0 + 86, cw - 30, 16, r.color, 12.5, 800);
+      wrap(r.s, x + cw / 2, y0 + 130, cw - 36, 15, '#cdd8e0', 10.5, 700);
+      ctx.restore();
+    });
+    label('практики из разбора кейсов', width / 2, height * 0.58, AMB, 12, 800);
+    const ew = Math.min(230, width * 0.24), eg = 12, ex0 = width / 2 - (ew * 4 + eg * 3) / 2;
+    EXTRAS.forEach((e, i) => {
+      const ap = Math.max(0, Math.min(1, d - 1.4 - i * 0.25)); if (ap <= 0) return;
+      const x = ex0 + i * (ew + eg), y = height * 0.63;
+      ctx.save(); ctx.globalAlpha = ap;
+      box(x, y, ew, 64, AMB, '', '', { glow: 8 });
+      label(e[0], x + 22, y + 32, '#fff', 18);
+      wrap(e[1], x + ew / 2 + 14, y + 32 - 7, ew - 62, 14, '#fde9c0', 10, 700);
+      ctx.restore();
+    });
+    label('нулевое доверие — и между агентами', width / 2, height * 0.08, EM, 14, 800);
+  }
+
+  // ── Scene 7: our checklist ──
+  function renderOurs() {
+    customState.ck = Math.min(CHECKS.length + 0.5, (customState.ck || 0) + 0.011);
+    const x0 = width * 0.07, w = width * 0.86, y0 = height * 0.17, rh = height * 0.115, gap = 12;
+    CHECKS.forEach((c, i) => {
+      const y = y0 + i * (rh + gap), done = customState.ck > i + 0.6;
+      box(x0, y, w, rh, done ? c.color : '#334155', '', '', { glow: done ? 12 : 2 });
+      label(c.icon, x0 + 36, y + rh / 2, '#fff', 22);
+      label(c.t, x0 + 74, y + rh * 0.38, '#fff', 13, 800, 'left');
+      label(c.s, x0 + 74, y + rh * 0.72, done ? c.color : MUT, 10.5, 700, 'left');
+      box(x0 + w - 130, y + rh / 2 - 17, 108, 34, done ? EM : '#475569', '', '', { glow: done ? 8 : 0, bg: 'rgba(5,12,10,0.9)' });
+      label(done ? '✓ проверить' : '○ ждёт', x0 + w - 76, y + rh / 2, done ? EM : MUT, 11, 800);
+    });
+    label('Simulator MCP · Corezoid · Jira', width / 2, height * 0.08, BLUE, 13, 800);
+    label('чек-лист для ревью, а не утверждение об уязвимости', width / 2, height * 0.9, AMB, 12, 800);
+  }
+
+  // ── Scene 8: caveats + summary ──
+  function renderEnd() {
+    const cw = Math.min(340, width * 0.4), y0 = height * 0.16, ch = height * 0.33;
+    const L = width * 0.5 - cw - 14, R = width * 0.5 + 14;
+    box(L, y0, cw, ch, EM, '', '', { glow: 12, bg: 'rgba(5,16,12,0.92)' });
+    label('✅ Подтверждено', L + cw / 2, y0 + 26, EM, 14, 900);
+    ['5 организаций · один класс ошибки', 'кейсы сверены с первоисточником', 'схемы атак опубликованы'].forEach((s, i) => wrap(s, L + cw / 2, y0 + 70 + i * 40, cw - 36, 14, '#d6f3e6', 11.5, 700));
+    box(R, y0, cw, ch, AMB, '', '', { glow: 12, bg: 'rgba(20,14,4,0.92)' });
+    label('⚠ Оговорки', R + cw / 2, y0 + 26, AMB, 14, 900);
+    ['заголовок шире сути: типовые конфигурации MCP', 'пересказ 3DNews ← Ars Technica', 'CVE-2026-97228 (2,7) — не SSRF, а GraphQL-инъекция'].forEach((s, i) => wrap(s, R + cw / 2, y0 + 70 + i * 40, cw - 36, 14, '#fde9c0', 11.5, 700));
+    const gx = width * 0.5, gy = height * 0.76;
+    [L + cw / 2, R + cw / 2].forEach(x => { line(x, y0 + ch, gx, gy - 28, 'rgba(148,163,184,0.25)', 1.5, [4, 4]); flowDots(x, y0 + ch, gx, gy - 28, x < gx ? EM : AMB, 0.35, 2, 2.5); });
+    box(gx - 330, gy - 28, 660, 56, VIO, '', '', { glow: 16 });
+    label('агент в цепочке — не «свой», а недоверенный узел', gx, gy, '#fff', 12.5, 800);
+    label('права и проверки — на каждом переходе', width / 2, height * 0.08, EM, 14, 800);
+  }
+
+  // ── Effects ──
+  function renderEffects() {
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const sw = shockwaves[i];
+      sw.radius += (sw.maxRadius - sw.radius) * 0.12; sw.life -= sw.decay;
+      if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
+      ctx.save(); ctx.strokeStyle = sw.color; ctx.globalAlpha = sw.life; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.x += sp.vx; sp.y += sp.vy; sp.life -= sp.decay;
+      if (sp.life <= 0) { sparks.splice(i, 1); continue; }
+      ctx.save(); ctx.fillStyle = sp.color; ctx.globalAlpha = sp.life; ctx.shadowColor = sp.color; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UI & STORY CONTROLLER
+  // ═══════════════════════════════════════════════════════════════════════════
+  const topNav = document.getElementById('top-nav');
+  const deckScroll = document.getElementById('deck-scroll');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  const btnPlay = document.getElementById('btn-play');
+  const btnRestart = document.getElementById('btn-restart');
+  const voiceToggle = document.getElementById('voice-toggle');
+  const progressBar = document.getElementById('progress-bar');
+  const slideCounter = document.getElementById('slide-counter');
+  const captionText = document.getElementById('stage-caption-text');
+  const sceneNote = document.getElementById('stage-scene-note');
+  const btnPresenter = document.getElementById('btn-presenter');
+
+  const storyNavBadges = [];
+  const slideViews = [];
+
+  const LEGENDS = {
+    pp_intro:   [[CY, 'агент'], [RED, 'заражён'], [MUT, 'связь доверия']],
+    pp_mech:    [[RED, 'атака'], [EM, 'фильтр модели'], [AMB, 'доверие агентов']],
+    pp_pivot:   [[CY, 'вход · MCP'], [AMB, 'выход · A2A/ANP'], [RED, 'доверие без проверки']],
+    pp_chain:   [[EM, 'вход проверен'], [MUT, 'связь не видна'], [RED, 'вредоносная цепочка']],
+    pp_cases:   [[RED, 'Google'], [AMB, 'JPMorgan'], [VIO, 'Weaviate'], [BLUE, 'DINUM'], [MAG, 'Тангеранг']],
+    pp_defense: [[EM, 'правила автора'], [AMB, 'практики из кейсов']],
+    pp_ours:    [[BLUE, 'Simulator · Corezoid · Jira'], [EM, 'проверить']],
+    pp_end:     [[EM, 'подтверждено'], [AMB, 'оговорки'], [VIO, 'вывод']]
+  };
+  const legendEl = document.getElementById('stage-legend');
+  const stageFade = document.getElementById('stage-fade');
+
+  function updateLegend(index) {
+    const rows = LEGENDS[slidesData[index].mode];
+    if (!rows) { legendEl.style.display = 'none'; return; }
+    legendEl.style.display = 'flex';
+    legendEl.innerHTML = '<div class="legend-title">Обозначения</div>' + rows.map(
+      ([c, l]) => `<div class="legend-item"><span class="legend-dot" style="background:${c};color:${c}"></span>${l}</div>`
+    ).join('');
+  }
+
+  function buildUI() {
+    slidesData.forEach((s, idx) => {
+      if (idx > 0) {
+        const sep = document.createElement('span');
+        sep.className = 'nav-sep'; sep.textContent = '→'; topNav.appendChild(sep);
+      }
+      const b = document.createElement('button');
+      b.className = 'nav-badge' + (idx === 0 ? ' active' : '');
+      b.innerHTML = `<span class="num">${idx + 1}</span><span>${s.storyLabel}</span>`;
+      b.onclick = () => goToSlide(idx, { forceSpeak: voiceToggle.checked });
+      topNav.appendChild(b);
+      storyNavBadges.push(b);
+
+      const slide = document.createElement('div');
+      slide.className = 'slide-view' + (idx === 0 ? ' active' : '');
+      slide.innerHTML = `
+        <div class="slide-tag-line" style="color: ${s.tagColor}">${s.icon} ${s.tag}</div>
+        <h1 class="slide-title">${s.title}</h1>
+        <div class="slide-desc">${s.desc}</div>
+        <div class="callout-box ${s.calloutClass}">${s.callout}</div>
+      `;
+      deckScroll.appendChild(slide);
+      slideViews.push(slide);
+    });
+    updateUI();
+  }
+
+  function goToSlide(index, options = {}) {
+    if (index < 0 || index >= slidesData.length) return;
+    currentSlide = index;
+    if (stageFade) { stageFade.style.transition = 'none'; stageFade.style.opacity = '1'; }
+    initScene(index);
+    updateUI();
+    updatePresenterWindow(index);
+    if (stageFade) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        stageFade.style.transition = 'opacity 0.45s ease'; stageFade.style.opacity = '0';
+      }));
+    }
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+
+    const shouldSpeak = voiceToggle.checked && options.forceSpeak;
+    if (shouldSpeak) speakSlide(index);
+    else { prefetch(index); prefetch(index + 1); }
+  }
+
+  function updateUI() {
+    btnPrev.disabled = currentSlide === 0;
+    btnNext.disabled = currentSlide === slidesData.length - 1;
+    slideCounter.textContent = `${currentSlide + 1} / ${slidesData.length}`;
+    captionText.textContent = slidesData[currentSlide].caption;
+    if (sceneNote) sceneNote.textContent = slidesData[currentSlide].sceneNote || '';
+    updateLegend(currentSlide);
+    slideViews.forEach((v, i) => v.classList.toggle('active', i === currentSlide));
+    storyNavBadges.forEach((b, i) => b.classList.toggle('active', i === currentSlide));
+    const activeBadge = storyNavBadges[currentSlide];
+    if (activeBadge) activeBadge.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUDIO & TTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  let isPlaying = false;
+  let ttsAudio = null;
+  const preloadPool = {};
+  const NARRATION_VERSION = 'pp-8-20261013-v1';
+  voiceToggle.checked = false;
+
+  function ttsUrl(idx) {
+    const voice = localStorage.getItem('presentationVoiceChoice') || '';
+    return `narration/protocol_pivoting/${__voiceSlug(voice)}/${idx}.mp3?v=${NARRATION_VERSION}`;
+  }
+  function prefetch(idx) {
+    if (idx < 0 || idx >= slidesData.length || preloadPool[idx]) return;
+    const a = new Audio(ttsUrl(idx)); a.preload = 'auto'; preloadPool[idx] = a;
+  }
+  function speakSlide(idx) {
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = true; btnPlay.textContent = '⏸ Пауза';
+    const audio = preloadPool[idx] || new Audio(ttsUrl(idx));
+    delete preloadPool[idx]; audio.preload = 'auto'; ttsAudio = audio;
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration) progressBar.style.width = ((audio.currentTime / audio.duration) * 100) + '%';
+    });
+    audio.addEventListener('ended', () => {
+      isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+      if (currentSlide < slidesData.length - 1) goToSlide(currentSlide + 1, { forceSpeak: true });
+    });
+    audio.play().catch(() => { isPlaying = false; btnPlay.textContent = '▶ Играть'; });
+    prefetch(idx + 1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRESENTER WINDOW
+  // ═══════════════════════════════════════════════════════════════════════════
+  let presenterWindow = null;
+  let presenterRenderToken = 0;
+  function getPresenterDoc() { return (presenterWindow && !presenterWindow.closed) ? presenterWindow.document : null; }
+  function formatNarrationHtml(text) {
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sentences = (text.match(/[^.!?…]+[.!?…]+["»)]*\s*/g) || [text]).map(s => s.trim()).filter(Boolean);
+    const paras = [];
+    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(' '));
+    return paras.map(p => '<p>' + esc(p) + '</p>').join('') || esc(text);
+  }
+  function renderPresenter(index) {
+    const doc = getPresenterDoc();
+    if (!doc) return;
+    const d = slidesData[index];
+    const token = ++presenterRenderToken;
+    const dotsHtml = slidesData.map((s, i) =>
+      `<button class="p-dot${i === index ? ' active' : ''}" data-slide="${i}" style="--p-dot:${s.tagColor}"></button>`
+    ).join('');
+    doc.body.innerHTML = `
+      <header>
+        <div>
+          <div class="eyebrow">🖥 Пульт докладчика · Protocol pivoting</div>
+          <div class="counter">Слайд ${index + 1} из ${slidesData.length}</div>
+        </div>
+        <button id="closeBtn" class="close" title="Закрыть пульт">✕</button>
+      </header>
+      <main class="notes">
+        <div class="pane-label">Точный текст озвучки &amp; Тезисы</div>
+        <div class="pv-tag" style="color:${d.tagColor}">${d.icon} ${d.tag}</div>
+        <h2>${d.title}</h2>
+        <div id="narrContent" class="pv-text">Загрузка текста озвучки…</div>
+        <div class="pv-callout">${d.callout}</div>
+        ${PRESENTER_TIPS[index] ? `<div class="pv-tip"><span class="pv-tip-label">🎛 Что на сцене</span>${PRESENTER_TIPS[index]}</div>` : ''}
+      </main>
+      <footer>
+        <button id="pPrevBtn" class="p-nav-btn" ${index === 0 ? 'disabled' : ''}>‹</button>
+        <div class="dots-wrap">${dotsHtml}</div>
+        <button id="pNextBtn" class="p-nav-btn" ${index === slidesData.length - 1 ? 'disabled' : ''}>›</button>
+      </footer>
+    `;
+    doc.getElementById('closeBtn').onclick = () => presenterWindow.close();
+    doc.getElementById('pPrevBtn').onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+    doc.getElementById('pNextBtn').onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+    doc.querySelectorAll('[data-slide]').forEach(b => {
+      b.onclick = () => goToSlide(Number(b.dataset.slide), { forceSpeak: voiceToggle.checked });
+    });
+    fetch(`narration/protocol_pivoting/${index}.json`)
+      .then(r => { if (!r.ok) throw new Error('error'); return r.json(); })
+      .then(p => {
+        if (token !== presenterRenderToken) return;
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = formatNarrationHtml(p.text);
+      })
+      .catch(() => {
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = `<p>${d.desc}</p>`;
+      });
+  }
+  function updatePresenterWindow(index) { if (getPresenterDoc()) renderPresenter(index); }
+
+  async function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); renderPresenter(currentSlide); return; }
+    if ('documentPictureInPicture' in window) {
+      try {
+        presenterWindow = await documentPictureInPicture.requestWindow({
+          width: Math.max(380, Math.min(540, Math.round(screen.availWidth * 0.26))),
+          height: Math.max(540, Math.round(screen.availHeight * 0.88)),
+          disallowReturnToOpener: true
+        });
+      } catch (e) { presenterWindow = null; }
+    }
+    if (!presenterWindow) presenterWindow = window.open('', 'pp-presenter', 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
+    if (!presenterWindow) { alert('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для пульта.'); return; }
+    presenterWindow.document.write(`<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Пульт докладчика — Protocol pivoting</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: #061019; color: #bfd6e0; font-family: 'Inter', -apple-system, sans-serif; }
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #0a1a24; border-bottom: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .eyebrow { color: #22d3ee; font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .counter { margin-top: 4px; color: #7f97a6; font-size: 11px; font-weight: 700; }
+    .close { width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    .close:hover { background: rgba(34,211,238,.25); color: #fff; }
+    .notes { flex: 1; padding: 24px 22px 90px; overflow-y: auto; }
+    .pane-label { margin-bottom: 16px; color: #5f7686; font-size: 10px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    .pv-tag { font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    h2 { margin: 10px 0 18px; color: #eef7fb; font-size: 24px; line-height: 1.2; font-weight: 800; }
+    .pv-text { font-size: 16px; line-height: 1.65; color: #d4e6ef; }
+    .pv-text p { margin-bottom: 14px; }
+    .pv-text p:first-child { font-weight: 600; color: #f0f9ff; }
+    .pv-callout { margin-top: 18px; padding: 14px 16px; border-radius: 10px; background: rgba(168,85,247,.1); border-left: 4px solid #a855f7; color: #e2ccfb; font-size: 14px; line-height: 1.5; }
+    .pv-tip { margin-top: 14px; padding: 13px 15px; border-radius: 10px; background: rgba(16,185,129,.08); border: 1px dashed rgba(16,185,129,.4); color: #bdeed7; font-size: 13.5px; line-height: 1.55; }
+    .pv-tip b { color: #eafff5; font-weight: 700; }
+    .pv-tip-label { display: block; margin-bottom: 6px; color: #10b981; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #0a1a24; border-top: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .p-nav-btn { width: 36px; height: 36px; font-size: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .p-nav-btn:hover:not(:disabled) { border-color: #22d3ee; color: #fff; background: rgba(34,211,238,.2); }
+    .p-nav-btn:disabled { opacity: .25; cursor: default; }
+    .dots-wrap { flex: 1; display: flex; justify-content: center; gap: 6px; }
+    .p-dot { width: 8px; height: 8px; border-radius: 50%; border: 0; background: #2b3f4d; cursor: pointer; transition: all 0.2s; }
+    .p-dot.active { width: 22px; border-radius: 4px; background: var(--p-dot); box-shadow: 0 0 10px var(--p-dot); }
+  </style>
+</head>
+<body></body>
+</html>`);
+    presenterWindow.document.close();
+    presenterWindow.addEventListener('pagehide', () => { btnPresenter.textContent = '🖥 Пульт'; });
+    btnPresenter.textContent = '🖥 Пульт открыт';
+    renderPresenter(currentSlide);
+    presenterWindow.focus();
+  }
+
+  // ── Event Listeners ──
+  btnPrev.onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+  btnNext.onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+  btnRestart.onclick = () => goToSlide(0, { forceSpeak: voiceToggle.checked });
+  btnPresenter.onclick = openPresenter;
+  btnPlay.onclick = () => {
+    if (isPlaying && ttsAudio) { ttsAudio.pause(); isPlaying = false; btnPlay.textContent = '▶ Играть'; }
+    else if (!isPlaying && ttsAudio) { ttsAudio.play(); isPlaying = true; btnPlay.textContent = '⏸ Пауза'; }
+    else speakSlide(currentSlide);
+  };
+  voiceToggle.addEventListener('change', () => {
+    if (!voiceToggle.checked && ttsAudio) {
+      ttsAudio.pause(); ttsAudio = null; isPlaying = false;
+      btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); btnNext.click(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); btnPrev.click(); }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); openPresenter(); }
+  });
+
+  // ── Boot ──
+  resizeCanvas();
+  buildUI();
+  const hashSlide = parseInt((location.hash || '').replace('#', ''), 10);
+  const startIndex = Number.isInteger(hashSlide) && hashSlide >= 1 && hashSlide <= slidesData.length ? hashSlide - 1 : 0;
+  currentSlide = startIndex;
+  initScene(startIndex);
+  updateUI();
+  prefetch(startIndex);
+  prefetch(startIndex + 1);
+  requestAnimationFrame(animate);
+  /* ── remote slide sync (active only with ?room=) ── */
+  if (window.PrezaSync && window.PrezaSync.active) {
+    var __prezaApplying = false, __lastApplied = '';
+    var __sync = window.PrezaSync.attach({
+      deckId: 'protocol_pivoting',
+      getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!isPlaying }; },
+      applyState: function (s) {
+        var __k = s.slide + '|' + (!!s.voiceOn) + '|' + (!!s.playing);
+        if (__k === __lastApplied) return;
+        __lastApplied = __k;
+        __prezaApplying = true;
+        try {
+          if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;
+          if (typeof s.slide === 'number' && s.slide !== currentSlide) {
+            goToSlide(s.slide, { forceSpeak: !!(s.voiceOn && s.playing) });
+          } else {
+            if (!s.voiceOn && ttsAudio) { ttsAudio.pause(); ttsAudio = null; isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%'; }
+            else if (s.playing && !isPlaying) { if (ttsAudio) { ttsAudio.play(); isPlaying = true; btnPlay.textContent = '⏸ Пауза'; } else if (s.voiceOn) { speakSlide(currentSlide); } }
+            else if (!s.playing && isPlaying && ttsAudio) { ttsAudio.pause(); isPlaying = false; btnPlay.textContent = '▶ Играть'; }
+          }
+        } finally { __prezaApplying = false; }
+      }
+    });
+    var __pub = function () { if (!__prezaApplying) __sync.publish(); };
+    var __origGo = goToSlide; goToSlide = function (i, o) { __origGo(i, o); __pub(); };
+    var __origPlay = btnPlay.onclick; btnPlay.onclick = function (e) { if (__origPlay) __origPlay.call(this, e); __pub(); };
+    voiceToggle.addEventListener('change', __pub);
+    __pub();
+  }
+})();
+</script>
+</body>
+</html>
