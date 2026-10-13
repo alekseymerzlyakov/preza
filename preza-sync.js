@@ -49,7 +49,7 @@
     chloroplasts: 'index.html', antares: 'index.html',
     antares_v2: 'antares-v2.html',
     cham: 'cham.html', cham_v2: 'cham-v2.html',
-    router_cve: 'router-cve.html', llm_testing: 'llm-testing.html',
+    router_cve: 'router-cve.html', llm_testing: 'llm-testing.html', rea: 'rea.html',
     block_design: 'block-design.html'
   };
   function pageBasename(p) { p = String(p).split('?')[0].split('#')[0]; var i = p.lastIndexOf('/'); return (i >= 0 ? p.slice(i + 1) : p) || 'index.html'; }
