@@ -698,22 +698,13 @@
       calloutClass: 'violet'
     },
     {
-      icon: '🕸', tag: 'Как мы · где применить', tagColor: EM, storyLabel: 'У нас: где', mode: 'simulator_map',
-      caption: 'Пять мест в нашем проекте simulator, где REA экономит время и даёт доказательства',
-      sceneNote: 'В центре — simulator. Вокруг — сценарии. Подсветка показывает, что именно разбирает REA.',
-      title: 'Как мы можем: где REA пригодится в simulator',
-      desc: `<span class="hl-cyan">Аудит клиентов</span> (web, Electron, APK) · <span class="hl-amber">интеграции без доков</span> (HAR → понять API → Corezoid-процесс) · <span class="hl-violet">легаси-логика</span> → граф · <span class="hl-emerald">Smart Forms</span>: что реально уходит в сеть · <span class="hl-red">безопасность и CVE</span>.`,
-      callout: `<b>Честно:</b> это гипотезы применения — подтвердить надо пилотом на одной нашей сборке. И только наш софт или с разрешением.`,
+      icon: '🔌', tag: 'Как мы · применение', tagColor: EM, storyLabel: 'У нас: интеграция', mode: 'use_case',
+      caption: 'API партнёра без документации: запись сессии (HAR) → REA → контракт → черновик процесса Corezoid',
+      sceneNote: 'Пять шагов слева направо. Между очисткой и REA — ✋: секреты вычищаем до того, как данные увидит агент.',
+      title: 'Как мы можем: API партнёра без доков → процесс Corezoid',
+      desc: `Партнёр не дал документацию. Мы записываем свою обычную работу в его кабинете в <span class="hl-cyan">HAR</span> (DevTools). <strong>REA разбирает запись офлайн</strong> — запросы, ответы, поля — и ничего не отправляет партнёру. Агент описывает <span class="hl-emerald">контракт API</span> и собирает <span class="hl-amber">черновик процесса Corezoid</span>.`,
+      callout: `<b>Правила:</b> сначала вычистить из HAR токены и пароли · записываем только то, что нам разрешено (свой аккаунт, условия партнёра) · черновик проверяет человек.`,
       calloutClass: 'emerald'
-    },
-    {
-      icon: '🔗', tag: 'Как мы · связка', tagColor: BLUE, storyLabel: 'REA + Simulator', mode: 'sim_pipeline',
-      caption: 'REA находит факты → агент кладёт их в simulator: актор-находка, граф связей, задача исполнителю',
-      sceneNote: 'У агента два MCP: REA и Simulator. Запись в simulator — только после подтверждения ✋.',
-      title: 'Связка: находки REA превращаются в объекты simulator',
-      desc: `У одного агента два MCP: <span class="hl-cyan">REA</span> разбирает цель, <span class="hl-violet">Simulator</span> принимает результат. Находка становится <strong>актором</strong>, связи — <strong>графом</strong>, а исправление — <strong>задачей</strong> с исполнителем. Запись идёт <span class="hl-amber">через подтверждение</span>.`,
-      callout: `<b>Выигрыш:</b> результат анализа сразу живёт в нашем рабочем контуре — с владельцем, статусом и историей, а не в чьём-то чате.`,
-      calloutClass: 'violet'
     },
     {
       icon: '🚦', tag: 'Границы и вывод', tagColor: EM, storyLabel: 'Границы · вывод', mode: 'limits_summary',
@@ -735,9 +726,8 @@
     'Кнопка <b>«➕ Следующая находка»</b> добавляет пункты в три колонки: наблюдение, вывод, неизвестное. Пример иллюстративный. Ключевая мысль: агент не может выдать догадку за факт, а мы можем перепроверить.',
     'Кнопка <b>«↺ Повторить»</b> заново печатает терминал. Покажи, что установка — одна команда и что setup делает бэкап и просит подтверждение. Перезапуск агента обязателен.',
     'Кнопка <b>«➡ Следующий кейс»</b> подсвечивает DX-Ball, Notion, TH04. Цифры из README: 3 205 тестов на оригинальном x86, 63 байта функции совпали. Главное — результат проверяемый.',
-    'Кнопка <b>«💡 Следующий сценарий»</b> подсвечивает пять мест применения. Это гипотезы, которые надо проверить пилотом. Обязательно проговори: только наш софт или с разрешением владельца.',
-    'Кнопка <b>«▶ Прогнать»</b> проводит находку от цели через REA и агента в simulator. Остановись на ✋: запись в simulator — только после подтверждения. Покажи три объекта: актор, граф, задача.',
-    'Финал: слева «можно», справа «нельзя» по DISCLAIMER проекта. Закрой призывом: пилот на 1–2 наших сборках. Напомни про лицензии IDA/Hopper/JEB — они на пользователе.'
+    'Кнопка <b>«▶ Показать путь»</b> проводит запись через пять шагов: HAR → очистка → REA → контракт → процесс Corezoid. Подчеркни: (1) REA работает с записью офлайн и ничего не шлёт партнёру; (2) на ✋ вычищаем токены и пароли до передачи агенту; (3) результат — черновик, финал за человеком. Это один рабочий сценарий для пилота, а не «внедрить везде».',
+    'Финал: слева «можно», справа «нельзя» по DISCLAIMER проекта. Закрой призывом: пилот на одной нашей интеграции. Напомни про лицензии IDA/Hopper/JEB — они на пользователе.'
   ];
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -926,13 +916,6 @@
     { icon: '📝', t: 'Notion', big: '4 шага', sub: 'renderer → preload → IPC → main', note: 'мост буфера обмена (Electron)', color: CY },
     { icon: '🕹', t: 'TH04', big: '16-бит', sub: 'DOS-инструкции → расчёт пуль', note: 'сравнение C++ с кодом компилятора', color: MAG }
   ];
-  const SIM_CASES = [
-    { icon: '🔐', t: 'Аудит клиентов', s: 'Что разбирает: web / Electron / APK наших сборок — маршруты, source maps, зашитые секреты.', color: CY },
-    { icon: '🔌', t: 'Интеграции без доков', s: 'Что разбирает: HAR-запись работы партнёрского API → понять контракт → собрать Corezoid-процесс.', color: AMB },
-    { icon: '📜', t: 'Легаси-логика', s: 'Что разбирает: как фича работает без документации → восстановить схему в графе simulator.', color: VIO },
-    { icon: '🧩', t: 'Smart Forms (CDU)', s: 'Что разбирает: JS-бандл и запросы формы — что реально уходит в сеть и куда.', color: EM },
-    { icon: '🛡', t: 'Безопасность и CVE', s: 'Что разбирает: подозрительный компонент → факты с доказательствами → оформление находки.', color: RED }
-  ];
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SCENE INITIALIZATION
@@ -946,8 +929,7 @@
     else if (mode === 'evidence') customState.ev = 0;
     else if (mode === 'terminal') customState.ty = 0;
     else if (mode === 'showcases') { customState.act = 0; customState.tm = 0; }
-    else if (mode === 'simulator_map') { customState.act = 0; customState.tm = 0; }
-    else if (mode === 'sim_pipeline') customState.pt = 0;
+    else if (mode === 'use_case') customState.ut = 0;
     renderHUDControls(slideIndex);
   }
 
@@ -972,8 +954,7 @@
     else if (mode === 'evidence') hudBtn('➕ Следующая находка', () => { customState.ev = Math.min(3, Math.floor(customState.ev) + 1); });
     else if (mode === 'terminal') hudBtn('↺ Повторить', () => { customState.ty = 0; });
     else if (mode === 'showcases') hudBtn('➡ Следующий кейс', () => { customState.act = (customState.act + 1) % SHOWCASES.length; customState.tm = 0; });
-    else if (mode === 'simulator_map') hudBtn('💡 Следующий сценарий', () => { customState.act = (customState.act + 1) % SIM_CASES.length; customState.tm = 0; });
-    else if (mode === 'sim_pipeline') hudBtn('▶ Прогнать', () => { customState.pt = 0; customState._done = false; });
+    else if (mode === 'use_case') hudBtn('▶ Показать путь', () => { customState.ut = 0; customState._done = false; });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -982,7 +963,7 @@
   const RENDERERS = {
     rea_intro: renderIntro, blackbox_layers: renderLayers, rea_flow: renderFlow, targets_hub: renderTargets,
     evidence: renderEvidence, terminal: renderTerminal, showcases: renderShowcases,
-    simulator_map: renderSimMap, sim_pipeline: renderSimPipeline, limits_summary: renderLimits
+    use_case: renderUseCase, limits_summary: renderLimits
   };
   function animate() {
     requestAnimationFrame(animate);
@@ -1244,75 +1225,50 @@
     label('Кейсы авторов REA (rea.tools/showcase)', width / 2, height * 0.08, MAG, 12.5, 800);
   }
 
-  // ── Scene 8: simulator map ──
-  function renderSimMap() {
-    customState.tm = (customState.tm || 0) + 0.016;
-    if (customState.tm > 4) { customState.tm = 0; customState.act = (customState.act + 1) % SIM_CASES.length; }
-    const cx = width * 0.5, cy = height * 0.44, rx = width * 0.36, ry = height * 0.27;
-    SIM_CASES.forEach((c, i) => {
-      const ang = -Math.PI / 2 + i / SIM_CASES.length * Math.PI * 2;
-      const x = cx + Math.cos(ang) * rx, y = cy + Math.sin(ang) * ry;
-      const on = i === customState.act;
-      line(cx, cy, x, y, on ? c.color : 'rgba(148,163,184,0.18)', on ? 2.5 : 1, on ? null : [4, 4]);
-      if (on) flowDots(x, y, cx, cy, c.color, 0.7, 3, 3.5);
-      box(x - 88, y - 26, 176, 52, on ? c.color : '#334155', '', '', { glow: on ? 16 : 3 });
-      label(c.icon, x - 62, y, '#fff', 20);
-      wrap(c.t, x + 14, y - (c.t.length > 17 ? 7 : 0), 112, 14, on ? '#fff' : '#9fb2bf', 11.5, 800);
-    });
-    hub(cx, cy, 54, VIO, '🕸', 'simulator', '');
-    const cur = SIM_CASES[customState.act];
-    box(width * 0.5 - 300, height * 0.80, 600, 56, cur.color, '', '', { glow: 12 });
-    wrap(cur.s, width / 2, height * 0.80 + 22, 560, 16, '#fff', 11.5, 700);
-    label('REA + наш simulator · пять сценариев', width / 2, height * 0.07, EM, 13, 800);
-  }
-
-  // ── Scene 9: pipeline REA → Simulator ──
-  function renderSimPipeline() {
-    customState.pt = Math.min(1, (customState.pt || 0) + 0.003);
-    const t = customState.pt, yM = height * 0.33;
+  // ── Scene 8: one working use case ──
+  function renderUseCase() {
+    customState.ut = Math.min(1.2, (customState.ut || 0) + 0.0022);
+    const t = customState.ut, yM = height * 0.30, bw = 150, bh = 112;
     const S = [
-      { x: width * 0.11, icon: '🎯', t: 'Цель', s: 'сборка · HAR · APK', color: RED },
-      { x: width * 0.35, icon: '🔎', t: 'REA', s: 'находки + evidence', color: CY },
-      { x: width * 0.59, icon: '🤖', t: 'Агент', s: '2 MCP: REA + Simulator', color: VIO },
-      { x: width * 0.86, icon: '🕸', t: 'simulator', s: 'актор · граф · задача', color: EM }
+      { icon: '🌐', t: 'Партнёр', s: 'кабинет · доков нет', d: 'работаем как обычно, DevTools пишет HAR', color: RED },
+      { icon: '🧹', t: 'Очистка', s: 'токены · пароли', d: 'вычищаем секреты ✋ человек', color: AMB },
+      { icon: '🔎', t: 'REA', s: 'разбор HAR офлайн', d: 'запросы · ответы · поля · откуда', color: CY },
+      { icon: '🤖', t: 'Агент', s: 'контракт API', d: 'метод · URL · поля · auth + «неизвестное»', color: VIO },
+      { icon: '⚙️', t: 'Corezoid', s: 'черновик процесса', d: 'вызов API + тест на примерах из HAR', color: EM }
     ];
-    const gateX = (S[2].x + S[3].x) / 2;
-    for (let i = 0; i < 3; i++) line(S[i].x + 66, yM, S[i + 1].x - 66, yM, 'rgba(148,163,184,0.3)', 2);
-    // token along whole path, stalls at the gate until t>0.6
-    const prog = Math.min(1, t / 0.9);
-    const gateHold = t > 0.5 && t < 0.62;
-    const total = S[3].x - 66 - (S[0].x + 66);
-    let tx = S[0].x + 66 + total * (gateHold ? (gateX - S[0].x - 58) / total : prog);
-    if (t >= 0.62) tx = S[0].x + 66 + total * Math.min(1, 0.7 + (t - 0.62) / 0.38 * 0.3);
-    ctx.save(); ctx.fillStyle = '#fff'; ctx.shadowColor = CY; ctx.shadowBlur = 14;
-    ctx.beginPath(); ctx.arc(Math.min(tx, S[3].x - 66), yM, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-
+    const xs = S.map((_, i) => width * (0.105 + i * 0.197));
+    for (let i = 0; i < 4; i++) {
+      line(xs[i] + bw / 2, yM, xs[i + 1] - bw / 2, yM, 'rgba(148,163,184,0.3)', 2);
+      if (t > (i + 1) / 5) flowDots(xs[i] + bw / 2, yM, xs[i + 1] - bw / 2, yM, S[i + 1].color, 0.5, 2, 3);
+    }
+    const pos = Math.min(4, t * 5);
+    const seg = Math.min(3, Math.floor(pos)), f = pos - seg;
+    if (t < 1.0) {
+      const tx = xs[seg] + bw / 2 + (xs[seg + 1] - bw / 2 - (xs[seg] + bw / 2)) * Math.max(0, Math.min(1, f * 1.15));
+      ctx.save(); ctx.fillStyle = '#fff'; ctx.shadowColor = CY; ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.arc(tx, yM, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
     S.forEach((n, i) => {
-      box(n.x - 66, yM - 58, 132, 116, n.color, '', '', { glow: 12 });
-      label(n.icon, n.x, yM - 24, '#fff', 24);
-      label(n.t, n.x, yM + 6, n.color, 12.5, 800);
-      wrap(n.s, n.x, yM + 28, 120, 12, '#b6c6d1', 9, 700);
+      const on = t * 5 >= i - 0.2;
+      box(xs[i] - bw / 2, yM - bh / 2, bw, bh, on ? n.color : '#334155', '', '', { glow: on ? 14 : 3 });
+      label(n.icon, xs[i], yM - 30, '#fff', 24);
+      label(n.t, xs[i], yM, on ? n.color : '#7f97a6', 12.5, 800);
+      wrap(n.s, xs[i], yM + 22, bw - 16, 12, on ? '#e6eef3' : '#64748b', 9.5, 700);
+      if (on) wrap(n.d, xs[i], yM + bh / 2 + 34, bw - 10, 13, '#b6c6d1', 9.5, 700);
     });
-    // gate
-    label('✋', gateX, yM - 4, RED, 26);
-    label('подтверждение', gateX, yM + 26, RED, 10.5, 800);
-    if (t >= 0.62 && !customState._done) { customState._done = true; addShockwave(S[3].x, yM, EM, 90); addSparks(S[3].x, yM, EM, 18, 5); }
+    // human gate marker on step 2
+    if (t * 5 >= 1.2) label('✋', xs[1], yM - bh / 2 - 16, RED, 22);
+    if (t >= 1.0 && !customState._done) { customState._done = true; addShockwave(xs[4], yM, EM, 90); addSparks(xs[4], yM, EM, 18, 5); }
 
-    // outputs under simulator
-    const outs = [['🎭', 'актор «Находка»', 0.7], ['🔗', 'граф связей', 0.8], ['✅', 'задача исполнителю', 0.9]];
-    outs.forEach((o, i) => {
-      const ap = Math.max(0, Math.min(1, (t - o[2]) / 0.1));
-      if (ap <= 0) return;
-      const x = width * 0.30 + i * 215, y = height * 0.62;
-      ctx.save(); ctx.globalAlpha = ap;
-      line(S[3].x, yM + 58, x + 100, y, 'rgba(16,185,129,0.35)', 1.5, [4, 4]);
-      box(x, y, 200, 54, EM, '', '', { glow: 10 });
-      label(o[0], x + 26, y + 27, '#fff', 18);
-      label(o[1], x + 118, y + 27, '#fff', 11, 800);
-      ctx.restore();
-    });
-    label('результат анализа сразу живёт в рабочем контуре: владелец · статус · история', width * 0.58, height * 0.80, MUT, 11, 700);
-    label('находка → объект simulator', width / 2, height * 0.08, VIO, 13, 800);
+    // before / after
+    const by = height * 0.66, cw = Math.min(330, width * 0.36);
+    box(width * 0.5 - cw - 14, by, cw, 88, RED, '', '', { glow: 8, bg: 'rgba(18,6,8,0.9)' });
+    label('Было', width * 0.5 - cw / 2 - 14, by + 20, RED, 13, 900);
+    wrap('читать сотни запросов в DevTools и гадать, какие поля обязательны', width * 0.5 - cw / 2 - 14, by + 46, cw - 30, 15, '#fbd5d5', 11, 700);
+    box(width * 0.5 + 14, by, cw, 88, EM, '', '', { glow: 12, bg: 'rgba(5,16,12,0.92)' });
+    label('Стало', width * 0.5 + 14 + cw / 2, by + 20, EM, 13, 900);
+    wrap('контракт API и черновик процесса — человек проверяет и правит', width * 0.5 + 14 + cw / 2, by + 46, cw - 30, 15, '#d6f3e6', 11, 700);
+    label('один сценарий · офлайн · без обращения к партнёру', width / 2, height * 0.08, EM, 13, 800);
   }
 
   // ── Scene 10: limits + summary ──
@@ -1381,8 +1337,7 @@
     evidence:        [[EM, 'наблюдение'], [AMB, 'вывод'], [RED, 'неизвестное']],
     terminal:        [[CY, 'команда'], [EM, 'успех'], [AMB, 'действие']],
     showcases:       [[EM, 'DX-Ball'], [CY, 'Notion'], [MAG, 'TH04']],
-    simulator_map:   [[VIO, 'simulator'], [EM, 'сценарии'], [CY, 'активный']],
-    sim_pipeline:    [[CY, 'REA'], [VIO, 'агент'], [RED, 'подтверждение ✋'], [EM, 'simulator']],
+    use_case:        [[RED, 'кабинет партнёра'], [CY, 'REA'], [VIO, 'агент'], [EM, 'процесс Corezoid']],
     limits_summary:  [[EM, 'можно'], [RED, 'нельзя'], [VIO, 'человек на воротах']]
   };
   const legendEl = document.getElementById('stage-legend');
@@ -1463,7 +1418,7 @@
   let isPlaying = false;
   let ttsAudio = null;
   const preloadPool = {};
-  const NARRATION_VERSION = 'rea-10-20261013-v1';
+  const NARRATION_VERSION = 'rea-9-20261013-v2';
   voiceToggle.checked = false;
 
   function ttsUrl(idx) {
