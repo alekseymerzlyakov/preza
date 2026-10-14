@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vericoding · ИИ пишет код вместе с доказательством</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #04070a; }
+
+    /* console-deck shell (shared with router-cve/cham); cyan primary + violet LLM accent */
+    #cham-app {
+      --bg: #04070b;
+      --panel: #0a1018;
+      --panel-glass: rgba(10, 16, 24, 0.75);
+      --border: rgba(34, 211, 238, 0.22);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --text: #eaf6fb;
+      --muted: #8fa3b3;
+      --violet: #a855f7;
+      --violet-glow: rgba(168, 85, 247, 0.45);
+      --magenta: #ec4899;
+      --cyan: #22d3ee;
+      --cyan-glow: rgba(34, 211, 238, 0.4);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.4);
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      --red: #ef4444;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Top Story Navigator ── */
+    .top-nav {
+      flex-shrink: 0;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, #071820 0%, #04070b 100%);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
+      z-index: 10;
+    }
+    .top-nav::-webkit-scrollbar { height: 3px; }
+    .top-nav::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 3px; }
+
+    .nav-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-badge:hover {
+      color: #fff;
+      border-color: var(--cyan);
+      background: rgba(34, 211, 238, 0.12);
+      transform: translateY(-1px);
+    }
+    .nav-badge.active {
+      color: #04141a;
+      background: linear-gradient(135deg, #67e8f9, #22d3ee);
+      border-color: #67e8f9;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+    .nav-badge .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.25);
+      color: inherit;
+      font-size: 0.62rem;
+      font-weight: 800;
+    }
+    .nav-sep { color: rgba(34, 211, 238, 0.35); font-size: 0.75rem; flex-shrink: 0; }
+
+    /* ── Main Layout ── */
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* ── Left Narrative Deck ── */
+    .deck-panel {
+      width: 480px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg, #071620 0%, #04070b 100%);
+      z-index: 5;
+      box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.02em;
+    }
+    .brand-title span { color: var(--violet); }
+    .brand-subtitle { font-size: 0.7rem; color: var(--muted); font-weight: 500; margin-top: 2px; }
+
+    .btn-presenter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(34, 211, 238, 0.08);
+      color: var(--cyan);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-presenter:hover {
+      background: rgba(34, 211, 238, 0.22);
+      border-color: #67e8f9;
+      color: #fff;
+    }
+
+    .deck-scroll {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 28px 32px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .deck-scroll::-webkit-scrollbar { width: 4px; }
+    .deck-scroll::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.25); border-radius: 2px; }
+
+    .slide-view { display: none; animation: slideFade 0.35s ease-out; }
+    .slide-view.active { display: block; }
+    @keyframes slideFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .slide-tag-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .slide-tag-line::before {
+      content: '';
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .slide-title {
+      font-size: 1.85rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.18;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+
+    .slide-desc {
+      font-size: 1.02rem;
+      line-height: 1.68;
+      color: #cddbe4;
+      margin-bottom: 18px;
+    }
+    .slide-desc strong { color: #fff; font-weight: 700; }
+    .slide-desc .hl-cyan { color: var(--cyan); font-weight: 700; }
+    .slide-desc .hl-violet { color: #c084fc; font-weight: 700; }
+    .slide-desc .hl-blue { color: #60a5fa; font-weight: 700; }
+    .slide-desc .hl-emerald { color: var(--emerald); font-weight: 700; }
+    .slide-desc .hl-amber { color: var(--amber); font-weight: 700; }
+    .slide-desc .hl-red { color: var(--red); font-weight: 700; }
+
+    .callout-box {
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(34, 211, 238, 0.08);
+      border: 1px solid rgba(34, 211, 238, 0.28);
+      border-left: 4px solid var(--cyan);
+      color: #c6e7ef;
+      font-size: 0.92rem;
+      line-height: 1.58;
+      margin-top: 14px;
+    }
+    .callout-box.emerald {
+      background: rgba(16, 185, 129, 0.07);
+      border-color: rgba(16, 185, 129, 0.28);
+      border-left-color: var(--emerald);
+      color: #a7e5ce;
+    }
+    .callout-box.cyan {
+      background: rgba(34, 211, 238, 0.07);
+      border-color: rgba(34, 211, 238, 0.28);
+      border-left-color: var(--cyan);
+      color: #b2eaf5;
+    }
+    .callout-box.violet {
+      background: rgba(168, 85, 247, 0.08);
+      border-color: rgba(168, 85, 247, 0.3);
+      border-left-color: var(--violet);
+      color: #ddc4fb;
+    }
+    .callout-box.amber {
+      background: rgba(245, 158, 11, 0.07);
+      border-color: rgba(245, 158, 11, 0.28);
+      border-left-color: var(--amber);
+      color: #ecd29b;
+    }
+    .callout-box.blue {
+      background: rgba(59, 130, 246, 0.07);
+      border-color: rgba(59, 130, 246, 0.28);
+      border-left-color: var(--blue);
+      color: #b9d6fc;
+    }
+    .callout-box.red {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.3);
+      border-left-color: var(--red);
+      color: #f6b9b9;
+    }
+    .callout-box b, .callout-box strong { color: #fff; }
+
+    .code-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(168, 85, 247, 0.14);
+      border: 1px solid rgba(168, 85, 247, 0.32);
+      color: #e2ccfb;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      font-weight: 700;
+    }
+
+    /* ── Bottom Deck Controls ── */
+    .deck-controls {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      gap: 8px;
+      flex-shrink: 0;
+      background: #061019;
+    }
+    .ctl-btn {
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .ctl-btn.icon-only { width: 34px; padding: 0; font-size: 15px; }
+    .ctl-btn.primary {
+      background: var(--cyan);
+      color: #04141a;
+      border: none;
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+    .ctl-btn.primary:hover:not(:disabled) { background: #67e8f9; color: #000; }
+    .ctl-btn.ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-light);
+      color: var(--muted);
+    }
+    .ctl-btn.ghost:hover:not(:disabled) {
+      border-color: var(--cyan);
+      color: #fff;
+      background: rgba(34, 211, 238, 0.1);
+    }
+    .ctl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .deck-progress {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 0 4px;
+    }
+    .deck-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--violet), var(--cyan));
+      transition: width 0.2s linear;
+    }
+
+    .slide-counter-badge {
+      font-size: 0.74rem;
+      font-weight: 800;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .voice-toggle-label {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border-light);
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .voice-toggle-label input { position: absolute; opacity: 0; pointer-events: none; }
+    .voice-toggle-label:hover { border-color: var(--cyan); }
+    .voice-toggle-label input:checked + .v-icon { color: var(--cyan); filter: drop-shadow(0 0 6px var(--cyan)); }
+    .v-icon { font-size: 15px; }
+
+    /* ── Right Stage: Interactive Physics & Graphics ── */
+    .stage-panel {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #stage-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Floating Canvas HUD Overlays */
+    .stage-hud-top {
+      position: absolute;
+      top: 18px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(6, 14, 20, 0.85);
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      backdrop-filter: blur(10px);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #dcefff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .hud-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: hudPulse 1.8s infinite;
+    }
+    @keyframes hudPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+
+    .hud-controls-group {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-action-btn {
+      padding: 7px 14px;
+      border-radius: 14px;
+      background: rgba(168, 85, 247, 0.18);
+      border: 1px solid rgba(168, 85, 247, 0.45);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
+    .hud-action-btn:hover {
+      background: var(--violet);
+      color: #fff;
+      box-shadow: 0 0 16px var(--violet-glow);
+      transform: translateY(-1px);
+    }
+
+    .stage-hud-bottom {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      width: max-content;
+      max-width: min(560px, 88%);
+    }
+    .stage-scene-note {
+      pointer-events: none;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #a9c2d1;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      max-width: 100%;
+    }
+    .stage-caption-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 22px;
+      border-radius: 30px;
+      background: rgba(5, 12, 18, 0.92);
+      border: 1px solid rgba(34, 211, 238, 0.45);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      color: #edf6fa;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .stage-caption-pill .cap-icon { color: var(--violet); font-size: 1rem; }
+
+    .interactive-dock {
+      position: absolute;
+      bottom: 106px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    .stage-legend {
+      position: absolute;
+      bottom: 20px;
+      left: 24px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(5, 12, 18, 0.82);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      pointer-events: none;
+      max-width: 250px;
+    }
+    .stage-legend .legend-title {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .stage-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #e0eef5;
+      line-height: 1.2;
+    }
+    .stage-legend .legend-dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .stage-fade {
+      position: absolute;
+      inset: 0;
+      z-index: 9;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle at 60% 50%, #0a2029 0%, #04070c 80%);
+    }
+  </style>
+</head>
+<body>
+
+<div id="cham-app">
+  <nav class="top-nav" id="top-nav" aria-label="Путь презентации"></nav>
+
+  <div class="main-workspace">
+
+    <aside class="deck-panel">
+      <div class="brand-header">
+        <div>
+          <div class="brand-title">🧬 <span>Vericoding</span> · benchmark</div>
+          <div class="brand-subtitle">разбор исследования arXiv:2509.22908 · код с доказательством · пилот для нас</div>
+        </div>
+        <button class="btn-presenter" id="btn-presenter" title="Открыть пульт докладчика">🖥 Пульт</button>
+      </div>
+
+      <div class="deck-scroll" id="deck-scroll"></div>
+
+      <div class="deck-controls">
+        <button id="btn-prev" class="ctl-btn ghost icon-only" aria-label="Назад" disabled>‹</button>
+        <button id="btn-play" class="ctl-btn primary">▶ Играть</button>
+        <button id="btn-restart" class="ctl-btn ghost icon-only" title="В начало">↺</button>
+        <div class="deck-progress"><div class="deck-progress-fill" id="progress-bar"></div></div>
+        <span class="slide-counter-badge" id="slide-counter">1 / 10</span>
+        <label class="voice-toggle-label" title="Озвучка (TTS)" aria-label="Голос">
+          <input type="checkbox" id="voice-toggle">
+          <span class="v-icon">🗣️</span>
+        </label>
+        <select id="vpick-select" title="Голос докладчика" aria-label="Голос докладчика" style="height:32px;border:1px solid #30363d;border-radius:7px;background:#0d1117;color:#c9d1d9;padding:0 8px;font:inherit;font-size:.8rem;cursor:pointer;max-width:160px;">
+          <option value="edge:ru-RU-DmitryNeural">🤖 Стандартный</option>
+          <option value="elevenlabs:mine">🎙 Мой голос</option>
+        </select>
+        <script>window.__voiceSlug=function(v){v=String(v||'');return v.indexOf('elevenlabs')===0?'mine':'edge';};</script>
+<script>(function(){var K='presentationVoiceChoice',D='elevenlabs:mine',s=document.getElementById('vpick-select');var v=localStorage.getItem(K);if(!v){v=D;localStorage.setItem(K,D);}s.value=[].some.call(s.options,function(o){return o.value===v})?v:D;s.addEventListener('change',function(){localStorage.setItem(K,s.value||D);});})();</script>
+        <button id="btn-next" class="ctl-btn ghost">Далее ›</button>
+      </div>
+    </aside>
+
+    <main class="stage-panel">
+      <canvas id="stage-canvas"></canvas>
+      <div class="stage-fade" id="stage-fade"></div>
+      <div class="stage-legend" id="stage-legend"></div>
+
+      <div class="stage-hud-top">
+        <div class="hud-pill">
+          <span class="hud-dot" id="hud-status-dot"></span>
+          <span id="hud-status-text">Formal Verification Lab · 60 FPS</span>
+        </div>
+        <div class="hud-controls-group" id="hud-actions"></div>
+      </div>
+
+      <div class="interactive-dock" id="interactive-dock"></div>
+
+      <div class="stage-hud-bottom">
+        <div class="stage-caption-pill">
+          <span class="cap-icon">✦</span>
+          <span id="stage-caption-text">Инициализация…</span>
+        </div>
+        <div class="stage-scene-note" id="stage-scene-note"></div>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script src="mqtt.min.js"></script>
+<script src="preza-sync.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COLORS
+  // ═══════════════════════════════════════════════════════════════════════════
+  const CY = '#22d3ee', EM = '#10b981', RED = '#ef4444', AMB = '#f59e0b',
+        VIO = '#a855f7', BLUE = '#3b82f6', MAG = '#ec4899', MUT = '#64748b';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SLIDES DATA
+  // ═══════════════════════════════════════════════════════════════════════════
+  const slidesData = [
+    {
+      icon: '🧬', tag: 'Разбор исследования · arXiv:2509.22908', tagColor: CY, storyLabel: 'Суть', mode: 'vb_intro',
+      caption: 'Не «код, который вроде работает», а код вместе с доказательством, что он соответствует требованиям',
+      sceneNote: 'Две дорожки: обычная генерация (тесты на выбранных входах) и vericoding (проверка для всех допустимых входов).',
+      title: 'Vericoding: код с доказательством',
+      desc: `<span class="hl-amber">Vibe coding:</span> описание словами → код → тесты на нескольких входах. <span class="hl-emerald">Vericoding:</span> <strong>формальная спецификация</strong> (требования на языке проверяющей системы) → код <strong>и доказательство</strong> → проверка для <strong>всех допустимых входов</strong>. Авторы (BAIF и MIT, 13 человек) собрали <span class="hl-cyan">самый большой бенчмарк</span> для этого: 12 504 задания.`,
+      callout: `<b>Коротко:</b> вопрос исследования — может ли ИИ создать код вместе с проверяемым доказательством его правильности.`,
+      calloutClass: 'cyan'
+    },
+    {
+      icon: '🧰', tag: 'Три системы проверки', tagColor: VIO, storyLabel: 'Dafny·Verus·Lean', mode: 'vb_langs',
+      caption: 'Dafny, Verus и Lean: у каждой свой способ доказывать свойства программ',
+      sceneNote: 'Чем сложнее система для модели, тем ниже доля решённых задач — и тем меньше примеров в обучении.',
+      title: 'Dafny, Verus и Lean',
+      desc: `<span class="hl-cyan">Dafny</span> — язык со встроенной проверкой, часть доказательства строится автоматически. <span class="hl-amber">Verus</span> — проверка программ на Rust с учётом машинных типов и переполнений. <span class="hl-violet">Lean</span> — язык и система доказательства теорем: функцию пишешь, свойства доказываешь вручную тактиками. Задачи небольшие: <strong>одна функция, обычно меньше 100 строк</strong>.`,
+      callout: `<b>Что решали:</b> алгоритмы и структуры данных, численные функции (по документации NumPy), длинная арифметика.`,
+      calloutClass: 'violet'
+    },
+    {
+      icon: '🏗', tag: 'Как собрали бенчмарк', tagColor: BLUE, storyLabel: 'Бенчмарк', mode: 'vb_build',
+      caption: '12 504 задания: Dafny 3 029, Verus 2 334, Lean 7 141 — из них 6 174 новых',
+      sceneNote: 'Слева — четыре шага сборки, справа — состав набора по языкам.',
+      title: '12 504 задания: как собрали',
+      desc: `Взяли <strong>готовые коллекции</strong> (DafnyBench, HumanEval, Verina, CLEVER, APPS, документация NumPy), <span class="hl-cyan">удалили код и доказательства</span> — остались только требования. Переводили условия между языками при помощи самих LLM (с критикой и исправлениями), затем отобрали задания: <strong>проверили компиляцию и качество</strong>. В открытом релизе 12 504 задания, <span class="hl-emerald">6 174 из них новые</span>.`,
+      callout: `<b>Важно:</b> числа включают версии одной задачи на разных языках. Данные открытые — на GitHub (Beneficial-AI-Foundation).`,
+      calloutClass: 'blue'
+    },
+    {
+      icon: '🔁', tag: 'Как проверяли решение', tagColor: EM, storyLabel: 'Цикл', mode: 'vb_loop',
+      caption: 'Модель получает задание, пишет код и доказательство, верификатор возвращает ошибки — до 5 попыток',
+      sceneNote: 'Цикл: задание → код и доказательство → проверка → при ошибке сообщение возвращается модели.',
+      title: 'Цикл: код, доказательство, проверка',
+      desc: `Модель заполняет пропуски в задании и отправляет в верификатор. При ошибке <span class="hl-amber">сообщение возвращается модели</span> — до <strong>5 попыток</strong> (для длинной арифметики до 10). Правила: <span class="hl-red">требования менять нельзя</span>, незавершённые доказательства (<code>sorry</code>) не засчитываются, скрипт ищет попытки обмана.`,
+      callout: `<b>Итог:</b> успех — только когда верификатор принял и код, и доказательство без обходов.`,
+      calloutClass: 'emerald'
+    },
+    {
+      icon: '📊', tag: 'Результаты', tagColor: AMB, storyLabel: 'Результаты', mode: 'vb_results',
+      caption: 'Dafny 82%, Verus 44%, Lean 27% (объединение всех моделей) — разница определяется системой, а не только моделью',
+      sceneNote: 'Светлая полоса — лучшая одиночная модель, яркая — объединение 9 моделей (хоть одна решила).',
+      title: 'Dafny 82%, Verus 44%, Lean 27%',
+      desc: `Девять готовых моделей без дообучения. Показатель <strong>«объединение»</strong> — задачу решила хотя бы одна. Лидеры: <span class="hl-cyan">Claude Opus 4.1</span> в Dafny, <span class="hl-violet">GPT-5</span> в Verus и Lean. Отдельно: чистая верификация на DafnyBench выросла с <strong>68% (июнь 2024) до 96%</strong>. А описание словами в дополнение к спецификации <span class="hl-amber">заметного выигрыша не дало</span>.`,
+      callout: `<b>Читать аккуратно:</b> значения учитывают разрешённые повторные попытки; выборки — Dafny 2 161, Verus 2 166, Lean 2 361.`,
+      calloutClass: 'amber'
+    },
+    {
+      icon: '🕳', tag: 'Главная ловушка', tagColor: RED, storyLabel: 'Ловушка', mode: 'vb_cheat',
+      caption: 'Проверка прошла, а задача не решена: верификатор подтверждает только записанные условия',
+      sceneNote: 'Реальный пример из статьи, задача LC0033: «отсортировать и убрать повторы» — модель вернула пустой список.',
+      title: 'Проверка прошла — задача не решена',
+      desc: `Требование: <strong>отсортировать список и удалить повторы</strong>. В спецификации не было условия, что элементы входа сохраняются. Модель вернула <span class="hl-red">пустой список при любом входе</span> — формально это отсортировано и без повторов, верификатор принял. Доказательство верно, <strong>ошибка в постановке</strong>.`,
+      callout: `<b>Урок:</b> полноту спецификации должен проверить человек — машина доказывает только то, что записано.`,
+      calloutClass: 'red'
+    },
+    {
+      icon: '💸', tag: 'Цена и что дальше', tagColor: MAG, storyLabel: 'Цена', mode: 'vb_cost',
+      caption: '≈ $25 000 за обращения к моделям; экономической пользы работа не измеряла',
+      sceneNote: 'Слева — что известно о стоимости. Справа — чего в статье нет, и свежий эксперимент 2026 года.',
+      title: 'Цена и что осталось неизвестным',
+      desc: `Эксперименты обошлись примерно в <strong>$25 000</strong> через OpenRouter (без труда команды); один набор из 172 задач — <strong>3,8 млн токенов</strong>. Повторить различие GPT-5 и Gemini можно на <span class="hl-emerald">случайных 100 задачах</span>. <span class="hl-amber">В статье нет:</span> срока, человеко-часов, времени на одну задачу и данных об экономии.`,
+      callout: `<b>2026:</b> продолжение (Leo Yao, MIT) на 423 задачах Lean с GPT-5.4, режимом рассуждений и поиском по библиотеке Lean — другой эксперимент, прямое сравнение с 26,8% некорректно.`,
+      calloutClass: 'violet'
+    },
+    {
+      icon: '🧪', tag: 'Как мы · пилот', tagColor: BLUE, storyLabel: 'У нас', mode: 'vb_ours',
+      caption: 'Одна функция с деньгами: человек пишет спецификацию, ИИ — код и доказательство',
+      sceneNote: 'Пилот на одной чистой функции, например расчёт и разбиение комиссии. Это предложение, а не готовое решение.',
+      title: 'Как мы можем: пилот на одной функции',
+      desc: `Подходит <strong>короткая чистая функция с чёткими правилами</strong> — например, разбиение комиссии между счетами. <span class="hl-cyan">Человек пишет спецификацию:</span> доли не отрицательны, <strong>сумма долей равна общей сумме</strong>, округление не создаёт денег. ИИ пишет код и доказательство, Dafny проверяет. Dafny компилируется в JS, Python, Go — результат можно подключить в процесс.`,
+      callout: `<b>Критерий пилота:</b> сколько времени ушло на спецификацию и ревью против обычной разработки и тестов. Именно этого статья не измеряла.`,
+      calloutClass: 'blue'
+    },
+    {
+      icon: '⚖️', tag: 'Выводы', tagColor: EM, storyLabel: 'Выводы', mode: 'vb_end',
+      caption: 'Работает на коротких программах; полноту требований проверяет человек; выгоду ещё нужно измерить',
+      sceneNote: 'Три вывода из разбора. Внизу — оговорка: результаты получены на моделях 2025 года.',
+      title: 'Что показало исследование',
+      desc: `<span class="hl-emerald">1.</span> На коротких программах модель создаёт и код, и проверяемое доказательство. <span class="hl-amber">2.</span> Правильное доказательство не исправит ошибку в постановке — <strong>полноту требований проверяет человек</strong>. <span class="hl-violet">3.</span> Экономическую пользу ещё нужно измерить: данных об экономии времени и полной стоимости в работе нет.`,
+      callout: `<b>Оговорка:</b> это модели 2025 года (GPT-5, Opus 4.1); с тех пор результаты уже менялись — смотрите продолжение 2026 года.`,
+      calloutClass: 'emerald'
+    }
+  ];
+
+  // Пульт-only подсказки докладчику (не входят в озвучку).
+  const PRESENTER_TIPS = [
+    'Кнопка <b>«▶ Сравнить»</b> запускает обе дорожки. Мысль: тесты проверяют выбранные входы, доказательство — все допустимые. Три цифры внизу: 12 504 задания, 3 языка, 9 моделей.',
+    'Три карточки: Dafny (проще всего для модели), Verus (Rust, переполнения, меньше обучающих данных), Lean (теоремы, доказательства вручную). Задачи — одна функция до 100 строк.',
+    'Слева шаги сборки: готовые коллекции → удалить код и доказательства → перевести условия → отобрать. Справа состав по языкам. 6 174 новых задач. В PDF коллег: 10 868 после первичных проверок.',
+    'Кнопка <b>«▶ Попытка»</b> гонит точку по циклу. Скажи: до 5 попыток (до 10 для длинной арифметики), требования менять нельзя, sorry не засчитывается.',
+    'Кнопка <b>«▶ Показать»</b> растит полосы. Яркая — объединение моделей, светлая — лучшая одиночная (Dafny: Opus 4.1 67,5%; Verus: GPT-5 30,9%; Lean: GPT-5 17,9% на основных выборках). Внизу: верификация DafnyBench 68% → 89% (Opus 4.1) → 96% (объединение).',
+    'Кнопка <b>«▶ Запустить»</b>: вход [3,1,3,2], модель возвращает [], верификатор ставит ✓. Это реальная задача LC0033 из статьи. Главная мысль слайда: проверка не заменяет ревью требований.',
+    'Слева цена и объём, справа чего нет в статье. Продолжение 2026 (Leo Yao, MIT): GPT-5.4, 423 задачи Lean, режим рассуждений и поиск по библиотеке — другой эксперимент, с 26,8% напрямую не сравнивать.',
+    'Кнопка <b>«▶ Прогнать»</b> показывает конвейер. Подчеркни: это предложение пилота, не готовое решение. Человек пишет и ревьюит спецификацию, ИИ — реализацию и доказательство. Измеряем время и стоимость.',
+    'Финал: три вывода из разбора коллег. Оговорка: модели 2025 года. Предложение — один маленький пилот.'
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CANVAS ENGINE
+  // ═══════════════════════════════════════════════════════════════════════════
+  const canvas = document.getElementById('stage-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Projector readability: enlarge EVERY on-canvas label uniformly.
+  const FONT_SCALE = 1.35;
+  const _fontDesc = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'font');
+  Object.defineProperty(ctx, 'font', {
+    configurable: true,
+    get() { return _fontDesc.get.call(this); },
+    set(v) {
+      _fontDesc.set.call(this, String(v).replace(/(\d+(?:\.\d+)?)px/, (m, n) => (parseFloat(n) * FONT_SCALE).toFixed(1) + 'px'));
+    }
+  });
+
+  let width = 0, height = 0, dpr = 1;
+  function resizeCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    width = rect.width; height = rect.height;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.resetTransform && ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  let currentSlide = 0;
+  let animTime = 0;
+  let shockwaves = [];
+  let sparks = [];
+  let customState = {};
+
+  function addSparks(x, y, color, count = 16, maxSpeed = 5) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * maxSpeed;
+      sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 1.0, decay: 0.02 + Math.random() * 0.03, color, size: 2 + Math.random() * 3 });
+    }
+  }
+  function addShockwave(x, y, color, maxRadius = 80) {
+    shockwaves.push({ x, y, radius: 5, maxRadius, life: 1.0, decay: 0.03, color });
+  }
+
+  // ── Shared draw helpers ──
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function box(x, y, w, h, color, title, sub, opts) {
+    opts = opts || {};
+    ctx.save();
+    rr(x, y, w, h, opts.radius || 12);
+    ctx.fillStyle = opts.bg || 'rgba(8,16,24,0.88)';
+    ctx.fill();
+    ctx.lineWidth = opts.lw || 2;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color; ctx.shadowBlur = opts.glow != null ? opts.glow : 14;
+    ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (title) {
+      ctx.fillStyle = '#fff'; ctx.font = '700 15px Inter';
+      ctx.fillText(title, x + w / 2, y + h / 2 - (sub ? 9 : 0));
+    }
+    if (sub) { ctx.fillStyle = color; ctx.font = '700 12px JetBrains Mono'; ctx.fillText(sub, x + w / 2, y + h / 2 + 11); }
+    ctx.restore();
+  }
+  function line(x1, y1, x2, y2, color, w, dash) {
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = w || 2;
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.restore();
+  }
+  function flowDots(x1, y1, x2, y2, color, speed, count, size) {
+    for (let i = 0; i < count; i++) {
+      const t = ((animTime * speed + i / count) % 1);
+      const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
+      ctx.save();
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
+      ctx.globalAlpha = 0.35 + 0.5 * Math.sin(t * Math.PI);
+      ctx.beginPath(); ctx.arc(x, y, size || 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  function label(txt, x, y, color, size, weight, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = (weight || 700) + ' ' + (size || 13) + 'px Inter';
+    ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+  function mono(txt, x, y, color, size, align) {
+    ctx.save();
+    ctx.fillStyle = color; ctx.font = '700 ' + (size || 13) + 'px JetBrains Mono';
+    ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y); ctx.restore();
+  }
+  // horizontal progress/score bar
+  function bar(x, y, w, h, frac, color) {
+    ctx.save();
+    rr(x, y, w, h, h / 2); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
+    if (frac > 0) {
+      rr(x, y, Math.max(h, w * Math.min(1, frac)), h, h / 2);
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill();
+    }
+    ctx.restore();
+  }
+  // greedy word-wrap, centered on x; returns number of lines drawn
+  function wrap(txt, x, y, maxW, lh, color, size, weight, align) {
+    ctx.save();
+    ctx.font = (weight || 700) + ' ' + (size || 12) + 'px Inter';
+    const words = String(txt).split(' '); const rows = []; let cur = '';
+    words.forEach(w => {
+      const test = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && cur) { rows.push(cur); cur = w; } else cur = test;
+    });
+    if (cur) rows.push(cur);
+    ctx.restore();
+    rows.forEach((r, i) => label(r, x, y + i * lh, color, size, weight, align));
+    return rows.length;
+  }
+  function hub(x, y, r, color, icon, title, sub) {
+    const pulse = 0.5 + 0.5 * Math.sin(animTime * 2.2);
+    ctx.save();
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.25 + 0.2 * pulse; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, r + 12 + pulse * 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    box(x - r, y - r * 0.8, r * 2, r * 1.6, color, '', '', { glow: 20 });
+    label(icon, x, y - r * 0.2, '#fff', 26);
+    label(title, x, y + r * 0.35, color, 13, 800);
+    if (sub) label(sub, x, y + r * 0.62, '#9fb2bf', 10, 700);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCENE DATA
+  // ═══════════════════════════════════════════════════════════════════════════
+  const LANGS = [
+    { n: 'Dafny', ic: '🧮', c: CY, s: 'язык со встроенной проверкой', l: ['часть доказательства строит сама система', 'единые математические типы', 'много примеров в обучении'] },
+    { n: 'Verus', ic: '🦀', c: AMB, s: 'проверка программ на Rust', l: ['учитывает машинные типы', 'проверяет переполнения', 'новее, примеров меньше'] },
+    { n: 'Lean', ic: '📐', c: VIO, s: 'язык и доказательство теорем', l: ['доказательства строятся тактиками', 'модели учили на математике', 'подсказка о состоянии — 5 раз'] }
+  ];
+  const BSTEPS = [
+    ['📚', 'Готовые коллекции', 'DafnyBench · HumanEval · Verina · APPS · NumPy'],
+    ['✂️', 'Убрать код и доказательства', 'остаются только требования'],
+    ['🔄', 'Перевести условия', 'на другие языки, с критикой и правками'],
+    ['✅', 'Отобрать задания', 'компиляция и качество']
+  ];
+  const RES = [
+    { n: 'Dafny', c: CY, best: 67.5, un: 82.2, who: 'Opus 4.1' },
+    { n: 'Verus', c: AMB, best: 30.9, un: 44.3, who: 'GPT-5' },
+    { n: 'Lean', c: VIO, best: 17.9, un: 26.8, who: 'GPT-5' }
+  ];
+  const END3 = [
+    { n: '1', c: EM, t: 'Работает на коротких программах', s: 'модель создаёт и код, и проверяемое доказательство' },
+    { n: '2', c: AMB, t: 'Полноту требований проверяет человек', s: 'правильное доказательство не исправит ошибку в постановке' },
+    { n: '3', c: VIO, t: 'Пользу ещё нужно измерить', s: 'данных об экономии времени и полной стоимости нет' }
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCENE INITIALIZATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  function initScene(slideIndex) {
+    shockwaves = []; sparks = []; customState = {};
+    customState.t = 0;
+    renderHUDControls(slideIndex);
+  }
+
+  function renderHUDControls(slideIndex) {
+    const hudGroup = document.getElementById('hud-actions');
+    const dockGroup = document.getElementById('interactive-dock');
+    hudGroup.innerHTML = ''; dockGroup.innerHTML = '';
+    const mode = slidesData[slideIndex].mode;
+    const hudBtn = (html, onclick) => {
+      const b = document.createElement('button');
+      b.className = 'hud-action-btn'; b.innerHTML = html; b.onclick = onclick;
+      hudGroup.appendChild(b);
+    };
+    const labels = { vb_intro: '▶ Сравнить', vb_loop: '▶ Попытка', vb_results: '▶ Показать', vb_cheat: '▶ Запустить', vb_ours: '▶ Прогнать', vb_build: '↺ Заново', vb_langs: '↺ Заново', vb_cost: '↺ Заново', vb_end: '↺ Заново' };
+    hudBtn(labels[mode] || '↺ Заново', () => { customState.t = 0; });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN LOOP
+  // ═══════════════════════════════════════════════════════════════════════════
+  const RENDERERS = {
+    vb_intro: renderIntro, vb_langs: renderLangs, vb_build: renderBuild, vb_loop: renderLoop,
+    vb_results: renderResults, vb_cheat: renderCheat, vb_cost: renderCost, vb_ours: renderOurs, vb_end: renderEnd
+  };
+  function animate() {
+    requestAnimationFrame(animate);
+    if (document.hidden) return;
+    animTime += 0.016;
+    ctx.clearRect(0, 0, width, height);
+    drawBackgroundGrid();
+    const fn = RENDERERS[slidesData[currentSlide].mode];
+    if (fn) fn();
+    renderEffects();
+  }
+
+  function drawBackgroundGrid() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.05)';
+    ctx.lineWidth = 1;
+    const step = 44;
+    for (let x = 0; x < width; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+    for (let y = 0; y < height; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+    ctx.restore();
+  }
+  function lerp(a, b, t) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
+  function tick(d) { customState.t = (customState.t || 0) + (d || 0.012); return customState.t; }
+  function appear(t, i, step) { return Math.max(0, Math.min(1, t - i * (step || 0.4))); }
+
+  // ── Scene 1: vibe vs veri ──
+  function renderIntro() {
+    const t = tick(0.01);
+    const lanes = [
+      { y: height * 0.16, c: AMB, h: 'Обычная генерация · vibe coding', s: ['Описание словами', 'Код', 'Тесты на выбранных входах'], note: 'может содержать ошибки на других входах' },
+      { y: height * 0.40, c: EM, h: 'Vericoding', s: ['Формальная спецификация', 'Код + доказательство', 'Проверка для всех допустимых входов'], note: 'ошибка в коде — доказательство не пройдёт' }
+    ];
+    const bw = Math.min(250, width * 0.24), bh = 62, gap = (width * 0.9 - bw * 3) / 2, x0 = width * 0.05;
+    lanes.forEach((L, li) => {
+      label(L.h, x0, L.y - 14, L.c, 13, 800, 'left');
+      L.s.forEach((s, i) => {
+        const ap = appear(t, i + li * 0.5, 0.45); if (ap <= 0) return;
+        const x = x0 + i * (bw + gap);
+        ctx.save(); ctx.globalAlpha = ap;
+        box(x, L.y, bw, bh, L.c, '', '', { glow: 12 });
+        wrap(s, x + bw / 2, L.y + bh / 2 - (s.length > 24 ? 8 : 0), bw - 24, 17, '#fff', 12.5, 800);
+        if (i < 2) { line(x + bw, L.y + bh / 2, x + bw + gap, L.y + bh / 2, L.c, 1.6); flowDots(x + bw, L.y + bh / 2, x + bw + gap, L.y + bh / 2, L.c, 0.4, 2, 3); }
+        ctx.restore();
+      });
+      label(L.note, x0, L.y + bh + 18, L.c, 11, 700, 'left');
+    });
+    const ny = height * 0.66, nw = Math.min(250, width * 0.24);
+    [['12 504', 'задания в бенчмарке', CY], ['3', 'системы: Dafny · Verus · Lean', VIO], ['9', 'моделей без дообучения', AMB]].forEach((n, i) => {
+      const x = width / 2 - (nw * 3 + 24) / 2 + i * (nw + 12);
+      box(x, ny, nw, 64, n[2], '', '', { glow: 10 });
+      label(n[0], x + nw / 2, ny + 24, n[2], 22, 900);
+      label(n[1], x + nw / 2, ny + 48, '#cdd8e0', 10.5, 700);
+    });
+    label('A benchmark for vericoding · BAIF / MIT · 2025', width / 2, height * 0.07, CY, 13, 800);
+  }
+
+  // ── Scene 2: three systems ──
+  function renderLangs() {
+    const t = tick(0.012);
+    const cw = Math.min(280, width * 0.3), gap = 18, x0 = width / 2 - (cw * 3 + gap * 2) / 2, y0 = height * 0.15, ch = height * 0.5;
+    LANGS.forEach((L, i) => {
+      const ap = appear(t, i, 0.4); if (ap <= 0) return;
+      const x = x0 + i * (cw + gap);
+      ctx.save(); ctx.globalAlpha = ap;
+      box(x, y0, cw, ch, L.c, '', '', { glow: 14, bg: 'rgba(6,12,18,0.94)' });
+      label(L.ic, x + cw / 2, y0 + 42, '#fff', 34);
+      label(L.n, x + cw / 2, y0 + 88, L.c, 20, 900);
+      wrap(L.s, x + cw / 2, y0 + 118, cw - 30, 15, '#e6eef3', 11.5, 800);
+      L.l.forEach((s, k) => {
+        label('•', x + 24, y0 + 168 + k * 46, L.c, 14, 900, 'left');
+        wrap(s, x + cw / 2 + 8, y0 + 168 + k * 46, cw - 70, 15, '#cdd8e0', 11, 700);
+      });
+      label(['решено: 82%', 'решено: 44%', 'решено: 27%'][i], x + cw / 2, y0 + ch - 26, L.c, 15, 900);
+      ctx.restore();
+    });
+    label('одна функция · обычно меньше 100 строк', width / 2, height * 0.74, AMB, 12.5, 800);
+    label('чем сложнее система для модели, тем ниже результат', width / 2, height * 0.07, VIO, 13, 800);
+  }
+
+  // ── Scene 3: how benchmark built ──
+  function renderBuild() {
+    const t = tick(0.012);
+    const lx = width * 0.04, lw = width * 0.5, y0 = height * 0.15, sh = height * 0.14, sg = 10;
+    BSTEPS.forEach((s, i) => {
+      const ap = appear(t, i, 0.45); if (ap <= 0) return;
+      const y = y0 + i * (sh + sg);
+      ctx.save(); ctx.globalAlpha = ap;
+      box(lx, y, lw, sh, BLUE, '', '', { glow: 10 });
+      label(String(i + 1), lx + 22, y + sh / 2, BLUE, 18, 900);
+      label(s[0], lx + 62, y + sh / 2, '#fff', 24);
+      label(s[1], lx + 92, y + sh * 0.36, '#fff', 13, 800, 'left');
+      label(s[2], lx + 92, y + sh * 0.7, '#9fb2bf', 10.5, 700, 'left');
+      if (i < 3) flowDots(lx + lw / 2, y + sh, lx + lw / 2, y + sh + sg, BLUE, 0.5, 1, 2.5);
+      ctx.restore();
+    });
+    const rx = width * 0.58, rw = width * 0.38;
+    label('состав набора', rx + rw / 2, y0 - 4, CY, 12.5, 800);
+    const rows = [['Lean', 7141, VIO], ['Dafny', 3029, CY], ['Verus', 2334, AMB]];
+    rows.forEach((r, i) => {
+      const ap = appear(t, i + 2, 0.4), y = y0 + 30 + i * 58;
+      label(r[0], rx, y, '#fff', 13, 800, 'left');
+      bar(rx + 70, y - 9, rw - 160, 18, ap * r[1] / 7141, r[2]);
+      mono(Math.round(r[1] * ap).toLocaleString('ru-RU'), rx + rw, y, r[2], 13, 'right');
+    });
+    const ty = y0 + 30 + 3 * 58 + 6;
+    box(rx, ty, rw, 70, EM, '', '', { glow: 12, bg: 'rgba(5,16,12,0.92)' });
+    label('12 504 всего · 6 174 новых', rx + rw / 2, ty + 26, EM, 17, 900);
+    label('в версиях на разных языках · данные открытые', rx + rw / 2, ty + 50, '#d6f3e6', 10.5, 700);
+    label('три системы проверки · один набор требований', width / 2, height * 0.07, BLUE, 13, 800);
+  }
+
+  // ── Scene 4: loop ──
+  function renderLoop() {
+    const t = tick(0.006);
+    const bw = Math.min(250, width * 0.25), bh = 70, y = height * 0.28;
+    const gap = (width * 0.9 - bw * 3) / 2, x0 = width * 0.05;
+    const xs = [0, 1, 2].map(i => x0 + i * (bw + gap));
+    const T = [['📝 Задание', 'требования без решения', CY], ['🤖 Код + доказательство', 'модель заполняет пропуски', VIO], ['🔬 Верификатор', 'Dafny · Verus · Lean', EM]];
+    T.forEach((s, i) => {
+      box(xs[i], y, bw, bh, s[2], '', '', { glow: 14 });
+      label(s[0], xs[i] + bw / 2, y + 26, '#fff', 13.5, 800);
+      label(s[1], xs[i] + bw / 2, y + 48, s[2], 10.5, 700);
+      if (i < 2) { line(xs[i] + bw, y + bh / 2, xs[i + 1], y + bh / 2, s[2], 1.8); flowDots(xs[i] + bw, y + bh / 2, xs[i + 1], y + bh / 2, s[2], 0.4, 2, 3); }
+    });
+    // return path
+    const ry = y + bh + 70;
+    line(xs[2] + bw / 2, y + bh, xs[2] + bw / 2, ry, AMB, 1.8, [6, 5]);
+    line(xs[2] + bw / 2, ry, xs[1] + bw / 2, ry, AMB, 1.8, [6, 5]);
+    line(xs[1] + bw / 2, ry, xs[1] + bw / 2, y + bh, AMB, 1.8, [6, 5]);
+    label('ошибка верификатора возвращается модели', (xs[1] + xs[2] + bw) / 2, ry + 18, AMB, 12, 800);
+    // attempts
+    const att = Math.min(5, Math.floor(t * 5) + 1);
+    for (let i = 0; i < 5; i++) {
+      const on = i < att, x = width / 2 - 140 + i * 56;
+      box(x, height * 0.56, 44, 44, on ? AMB : '#334155', '', '', { glow: on ? 10 : 0 });
+      label(String(i + 1), x + 22, height * 0.56 + 22, on ? '#fff' : MUT, 15, 900);
+    }
+    label('до 5 попыток · для длинной арифметики до 10', width / 2, height * 0.56 + 66, '#cdd8e0', 11.5, 700);
+    const rules = [['🔒 требования менять нельзя', RED], ['🚫 sorry не засчитывается', RED], ['🕵 проверка на обман', AMB]];
+    rules.forEach((r, i) => {
+      const w = Math.min(260, width * 0.27), x = width / 2 - (w * 3 + 24) / 2 + i * (w + 12), yy = height * 0.72;
+      box(x, yy, w, 40, r[1], '', '', { glow: 6 });
+      label(r[0], x + w / 2, yy + 20, '#fff', 11.5, 800);
+    });
+    label('успех — только когда принят и код, и доказательство', width / 2, height * 0.07, EM, 13, 800);
+  }
+
+  // ── Scene 5: results ──
+  function renderResults() {
+    const t = Math.min(2.6, tick(0.012));
+    const x0 = width * 0.08, bw = width * 0.62, y0 = height * 0.17, rh = height * 0.15;
+    RES.forEach((r, i) => {
+      const ap = Math.min(1, Math.max(0, t - i * 0.25)), y = y0 + i * rh;
+      label(r.n, x0, y + 8, r.c, 17, 900, 'left');
+      bar(x0 + 90, y - 12, bw, 20, ap * r.un / 100, r.c);
+      mono((r.un * ap).toFixed(1) + '%', x0 + 90 + bw + 14, y - 2, r.c, 15, 'left');
+      ctx.save(); ctx.globalAlpha = 0.5; bar(x0 + 90, y + 14, bw, 11, ap * r.best / 100, r.c); ctx.restore();
+      label('лучшая одиночная: ' + r.who + ' ' + r.best.toFixed(1) + '%', x0 + 90, y + 40, '#9fb2bf', 10.5, 700, 'left');
+    });
+    const y2 = y0 + 3 * rh + 4;
+    box(x0, y2, width * 0.84, height * 0.17, CY, '', '', { glow: 12 });
+    label('Чистая верификация (DafnyBench)', width / 2, y2 + 24, CY, 12.5, 800);
+    const pts = [['июнь 2024 · Opus 3', 68], ['Opus 4.1', 89], ['объединение', 96]];
+    pts.forEach((p, i) => {
+      const ap = Math.min(1, Math.max(0, t - 0.8 - i * 0.2)), cx = width * 0.25 + i * width * 0.25;
+      label(Math.round(p[1] * ap) + '%', cx, y2 + 54, i === 2 ? EM : '#fff', 18, 900);
+      label(p[0], cx, y2 + 76, '#9fb2bf', 10, 700);
+      if (i < 2) label('→', cx + width * 0.125, y2 + 54, MUT, 18, 900);
+    });
+    label('яркая полоса — объединение 9 моделей · бледная — лучшая одиночная', width / 2, height * 0.07, AMB, 12.5, 800);
+  }
+
+  // ── Scene 6: LC0033 ──
+  function renderCheat() {
+    const t = tick(0.01);
+    const bw = Math.min(260, width * 0.26), bh = 150, y = height * 0.2, gap = (width * 0.9 - bw * 3) / 2, x0 = width * 0.05;
+    const xs = [0, 1, 2].map(i => x0 + i * (bw + gap));
+    box(xs[0], y, bw, bh, CY, '', '', { glow: 12 });
+    label('📝 Требование', xs[0] + bw / 2, y + 24, CY, 13, 900);
+    wrap('результат отсортирован', xs[0] + bw / 2, y + 62, bw - 30, 15, '#fff', 12, 700);
+    wrap('в результате нет повторов', xs[0] + bw / 2, y + 90, bw - 30, 15, '#fff', 12, 700);
+    wrap('нет условия: элементы входа сохраняются', xs[0] + bw / 2, y + 126, bw - 24, 13, RED, 10.5, 800);
+    const a1 = appear(t, 1, 0.5), a2 = appear(t, 2, 0.6);
+    ctx.save(); ctx.globalAlpha = a1;
+    box(xs[1], y, bw, bh, VIO, '', '', { glow: 12 });
+    label('🤖 Модель', xs[1] + bw / 2, y + 24, VIO, 13, 900);
+    mono('вход:  [3, 1, 3, 2]', xs[1] + bw / 2, y + 66, '#cdd8e0', 13, 'center');
+    mono('выход: []', xs[1] + bw / 2, y + 96, RED, 16, 'center');
+    label('пустой список при любом входе', xs[1] + bw / 2, y + 128, '#9fb2bf', 10.5, 700);
+    ctx.restore();
+    ctx.save(); ctx.globalAlpha = a2;
+    box(xs[2], y, bw, bh, EM, '', '', { glow: 14 });
+    label('🔬 Верификатор', xs[2] + bw / 2, y + 24, EM, 13, 900);
+    label('✓', xs[2] + bw / 2, y + 74, EM, 44, 900);
+    wrap('все записанные условия выполнены', xs[2] + bw / 2, y + 120, bw - 30, 14, '#d6f3e6', 10.5, 700);
+    ctx.restore();
+    [0, 1].forEach(i => { if ((i === 0 ? a1 : a2) > 0) { line(xs[i] + bw, y + bh / 2, xs[i + 1], y + bh / 2, '#475569', 1.6); flowDots(xs[i] + bw, y + bh / 2, xs[i + 1], y + bh / 2, i ? EM : VIO, 0.4, 2, 3); } });
+    const ap = appear(t, 3, 0.6);
+    ctx.save(); ctx.globalAlpha = ap;
+    box(width / 2 - 330, height * 0.62, 660, 74, RED, '', '', { glow: 16, bg: 'rgba(24,6,8,0.92)' });
+    label('Проверка прошла — задача не выполнена', width / 2, height * 0.62 + 27, '#fff', 15, 900);
+    label('верификатор подтверждает только то, что записано в спецификации', width / 2, height * 0.62 + 52, '#fecaca', 11.5, 700);
+    ctx.restore();
+    label('задача LC0033 · рис. 8 статьи', width / 2, height * 0.07, RED, 13, 800);
+  }
+
+  // ── Scene 7: cost ──
+  function renderCost() {
+    const t = tick(0.012);
+    const lw = width * 0.44, lx = width * 0.04, y0 = height * 0.15;
+    [['≈ $25 000', 'обращения к моделям (OpenRouter), без труда команды', MAG], ['3,8 млн токенов', 'один набор из 172 задач', CY], ['100 задач', 'хватает, чтобы повторить GPT-5 vs Gemini', EM]].forEach((n, i) => {
+      const ap = appear(t, i, 0.4); if (ap <= 0) return;
+      const y = y0 + i * (height * 0.2 + 8);
+      ctx.save(); ctx.globalAlpha = ap;
+      box(lx, y, lw, height * 0.2, n[2], '', '', { glow: 12 });
+      label(n[0], lx + lw / 2, y + height * 0.2 * 0.38, n[2], 21, 900);
+      wrap(n[1], lx + lw / 2, y + height * 0.2 * 0.72, lw - 30, 14, '#cdd8e0', 11, 700);
+      ctx.restore();
+    });
+    const rx = width * 0.52, rw = width * 0.44;
+    const ap1 = appear(t, 3, 0.4), ap2 = appear(t, 4, 0.4);
+    ctx.save(); ctx.globalAlpha = ap1;
+    box(rx, y0, rw, height * 0.3, AMB, '', '', { glow: 12, bg: 'rgba(20,14,4,0.92)' });
+    label('⚠ В статье не указано', rx + rw / 2, y0 + 24, AMB, 13, 900);
+    ['срок исследования', 'человеко-часы', 'время на одну задачу', 'экономия времени'].forEach((s, i) => label('• ' + s, rx + 30, y0 + 58 + i * 26, '#fde9c0', 11.5, 700, 'left'));
+    ctx.restore();
+    ctx.save(); ctx.globalAlpha = ap2;
+    const y2 = y0 + height * 0.3 + 14;
+    box(rx, y2, rw, height * 0.36, VIO, '', '', { glow: 12 });
+    label('2026 · продолжение (MIT)', rx + rw / 2, y2 + 24, VIO, 13, 900);
+    wrap('GPT-5.4 · 423 задачи Lean', rx + rw / 2, y2 + 56, rw - 30, 15, '#fff', 12, 800);
+    wrap('режим рассуждений + поиск готовых доказанных утверждений в библиотеке Lean', rx + rw / 2, y2 + 88, rw - 40, 15, '#cdd8e0', 11, 700);
+    wrap('другой эксперимент — с 26,8% напрямую не сравнивать', rx + rw / 2, y2 + 140, rw - 40, 15, AMB, 11, 800);
+    ctx.restore();
+    label('цена известна, польза — нет', width / 2, height * 0.07, MAG, 13, 800);
+  }
+
+  // ── Scene 8: our pilot ──
+  function renderOurs() {
+    const t = tick(0.01);
+    const steps = [
+      ['👤', 'Человек: спецификация', 'доли ≥ 0 · сумма долей = сумме · округление не создаёт денег', BLUE],
+      ['🤖', 'ИИ: код + доказательство', 'до 5 попыток с ответом верификатора', VIO],
+      ['🔬', 'Dafny проверяет', 'для всех допустимых входов', EM],
+      ['👤', 'Человек: ревью спецификации', 'не забыто ли условие (урок LC0033)', AMB],
+      ['⚙️', 'Компиляция в JS / Python / Go', 'подключить в процесс Corezoid', CY]
+    ];
+    const w = width * 0.88, x0 = width * 0.06, y0 = height * 0.15, rh = height * 0.12, gap = 10;
+    steps.forEach((s, i) => {
+      const ap = appear(t, i, 0.5); if (ap <= 0) return;
+      const y = y0 + i * (rh + gap);
+      ctx.save(); ctx.globalAlpha = ap;
+      box(x0, y, w, rh, s[3], '', '', { glow: 10 });
+      label(String(i + 1), x0 + 24, y + rh / 2, s[3], 18, 900);
+      label(s[0], x0 + 66, y + rh / 2, '#fff', 22);
+      label(s[1], x0 + 100, y + rh * 0.36, '#fff', 13, 800, 'left');
+      label(s[2], x0 + 100, y + rh * 0.72, s[3], 10.5, 700, 'left');
+      if (i < 4) flowDots(x0 + w / 2, y + rh, x0 + w / 2, y + rh + gap, s[3], 0.5, 1, 2.5);
+      ctx.restore();
+    });
+    label('пилот на одной чистой функции · предложение, не готовое решение', width / 2, height * 0.9, AMB, 12, 800);
+    label('Simulator · расчёт и разбиение комиссии', width / 2, height * 0.07, BLUE, 13, 800);
+  }
+
+  // ── Scene 9: conclusions ──
+  function renderEnd() {
+    const t = tick(0.012);
+    const w = Math.min(760, width * 0.84), x0 = width / 2 - w / 2, y0 = height * 0.15, rh = height * 0.17, gap = 12;
+    END3.forEach((e, i) => {
+      const ap = appear(t, i, 0.45); if (ap <= 0) return;
+      const y = y0 + i * (rh + gap);
+      ctx.save(); ctx.globalAlpha = ap;
+      box(x0, y, w, rh, e.c, '', '', { glow: 12 });
+      label(e.n, x0 + 38, y + rh / 2, e.c, 34, 900);
+      label(e.t, x0 + 78, y + rh * 0.38, '#fff', 15, 800, 'left');
+      label(e.s, x0 + 78, y + rh * 0.7, e.c, 11.5, 700, 'left');
+      ctx.restore();
+    });
+    const by = y0 + 3 * (rh + gap) + 4;
+    box(x0, by, w, 48, VIO, '', '', { glow: 14 });
+    label('модели 2025 года · человек проверяет требования', x0 + w / 2, by + 24, '#fff', 13, 800);
+    label('что показало исследование', width / 2, height * 0.07, EM, 14, 800);
+  }
+  // ── Effects ──
+  function renderEffects() {
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const sw = shockwaves[i];
+      sw.radius += (sw.maxRadius - sw.radius) * 0.12; sw.life -= sw.decay;
+      if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
+      ctx.save(); ctx.strokeStyle = sw.color; ctx.globalAlpha = sw.life; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.x += sp.vx; sp.y += sp.vy; sp.life -= sp.decay;
+      if (sp.life <= 0) { sparks.splice(i, 1); continue; }
+      ctx.save(); ctx.fillStyle = sp.color; ctx.globalAlpha = sp.life; ctx.shadowColor = sp.color; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UI & STORY CONTROLLER
+  // ═══════════════════════════════════════════════════════════════════════════
+  const topNav = document.getElementById('top-nav');
+  const deckScroll = document.getElementById('deck-scroll');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  const btnPlay = document.getElementById('btn-play');
+  const btnRestart = document.getElementById('btn-restart');
+  const voiceToggle = document.getElementById('voice-toggle');
+  const progressBar = document.getElementById('progress-bar');
+  const slideCounter = document.getElementById('slide-counter');
+  const captionText = document.getElementById('stage-caption-text');
+  const sceneNote = document.getElementById('stage-scene-note');
+  const btnPresenter = document.getElementById('btn-presenter');
+
+  const storyNavBadges = [];
+  const slideViews = [];
+
+  const LEGENDS = {
+    vb_intro:   [[AMB, 'vibe coding'], [EM, 'vericoding'], [CY, 'бенчмарк']],
+    vb_langs:   [[CY, 'Dafny'], [AMB, 'Verus'], [VIO, 'Lean']],
+    vb_build:   [[BLUE, 'шаги сборки'], [CY, 'Dafny'], [AMB, 'Verus'], [VIO, 'Lean']],
+    vb_loop:    [[CY, 'задание'], [VIO, 'модель'], [EM, 'верификатор'], [AMB, 'возврат ошибки']],
+    vb_results: [[CY, 'Dafny'], [AMB, 'Verus'], [VIO, 'Lean']],
+    vb_cheat:   [[CY, 'требование'], [VIO, 'модель'], [EM, 'проверка прошла'], [RED, 'дыра в спецификации']],
+    vb_cost:    [[MAG, 'цена'], [AMB, 'не указано'], [VIO, '2026']],
+    vb_ours:    [[BLUE, 'человек'], [VIO, 'ИИ'], [EM, 'проверка']],
+    vb_end:     [[EM, 'работает'], [AMB, 'человек'], [VIO, 'измерить']]
+  };
+  const legendEl = document.getElementById('stage-legend');
+  const stageFade = document.getElementById('stage-fade');
+
+  function updateLegend(index) {
+    const rows = LEGENDS[slidesData[index].mode];
+    if (!rows) { legendEl.style.display = 'none'; return; }
+    legendEl.style.display = 'flex';
+    legendEl.innerHTML = '<div class="legend-title">Обозначения</div>' + rows.map(
+      ([c, l]) => `<div class="legend-item"><span class="legend-dot" style="background:${c};color:${c}"></span>${l}</div>`
+    ).join('');
+  }
+
+  function buildUI() {
+    slidesData.forEach((s, idx) => {
+      if (idx > 0) {
+        const sep = document.createElement('span');
+        sep.className = 'nav-sep'; sep.textContent = '→'; topNav.appendChild(sep);
+      }
+      const b = document.createElement('button');
+      b.className = 'nav-badge' + (idx === 0 ? ' active' : '');
+      b.innerHTML = `<span class="num">${idx + 1}</span><span>${s.storyLabel}</span>`;
+      b.onclick = () => goToSlide(idx, { forceSpeak: voiceToggle.checked });
+      topNav.appendChild(b);
+      storyNavBadges.push(b);
+
+      const slide = document.createElement('div');
+      slide.className = 'slide-view' + (idx === 0 ? ' active' : '');
+      slide.innerHTML = `
+        <div class="slide-tag-line" style="color: ${s.tagColor}">${s.icon} ${s.tag}</div>
+        <h1 class="slide-title">${s.title}</h1>
+        <div class="slide-desc">${s.desc}</div>
+        <div class="callout-box ${s.calloutClass}">${s.callout}</div>
+      `;
+      deckScroll.appendChild(slide);
+      slideViews.push(slide);
+    });
+    updateUI();
+  }
+
+  function goToSlide(index, options = {}) {
+    if (index < 0 || index >= slidesData.length) return;
+    currentSlide = index;
+    if (stageFade) { stageFade.style.transition = 'none'; stageFade.style.opacity = '1'; }
+    initScene(index);
+    updateUI();
+    updatePresenterWindow(index);
+    if (stageFade) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        stageFade.style.transition = 'opacity 0.45s ease'; stageFade.style.opacity = '0';
+      }));
+    }
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+
+    const shouldSpeak = voiceToggle.checked && options.forceSpeak;
+    if (shouldSpeak) speakSlide(index);
+    else { prefetch(index); prefetch(index + 1); }
+  }
+
+  function updateUI() {
+    btnPrev.disabled = currentSlide === 0;
+    btnNext.disabled = currentSlide === slidesData.length - 1;
+    slideCounter.textContent = `${currentSlide + 1} / ${slidesData.length}`;
+    captionText.textContent = slidesData[currentSlide].caption;
+    if (sceneNote) sceneNote.textContent = slidesData[currentSlide].sceneNote || '';
+    updateLegend(currentSlide);
+    slideViews.forEach((v, i) => v.classList.toggle('active', i === currentSlide));
+    storyNavBadges.forEach((b, i) => b.classList.toggle('active', i === currentSlide));
+    const activeBadge = storyNavBadges[currentSlide];
+    if (activeBadge) activeBadge.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUDIO & TTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  let isPlaying = false;
+  let ttsAudio = null;
+  const preloadPool = {};
+  const NARRATION_VERSION = 'vb-9-20261014-v1';
+  voiceToggle.checked = false;
+
+  function ttsUrl(idx) {
+    const voice = localStorage.getItem('presentationVoiceChoice') || '';
+    return `narration/vericoding/${__voiceSlug(voice)}/${idx}.mp3?v=${NARRATION_VERSION}`;
+  }
+  function prefetch(idx) {
+    if (idx < 0 || idx >= slidesData.length || preloadPool[idx]) return;
+    const a = new Audio(ttsUrl(idx)); a.preload = 'auto'; preloadPool[idx] = a;
+  }
+  function speakSlide(idx) {
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    isPlaying = true; btnPlay.textContent = '⏸ Пауза';
+    const audio = preloadPool[idx] || new Audio(ttsUrl(idx));
+    delete preloadPool[idx]; audio.preload = 'auto'; ttsAudio = audio;
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration) progressBar.style.width = ((audio.currentTime / audio.duration) * 100) + '%';
+    });
+    audio.addEventListener('ended', () => {
+      isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+      if (currentSlide < slidesData.length - 1) goToSlide(currentSlide + 1, { forceSpeak: true });
+    });
+    audio.play().catch(() => { isPlaying = false; btnPlay.textContent = '▶ Играть'; });
+    prefetch(idx + 1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRESENTER WINDOW
+  // ═══════════════════════════════════════════════════════════════════════════
+  let presenterWindow = null;
+  let presenterRenderToken = 0;
+  function getPresenterDoc() { return (presenterWindow && !presenterWindow.closed) ? presenterWindow.document : null; }
+  function formatNarrationHtml(text) {
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sentences = (text.match(/[^.!?…]+[.!?…]+["»)]*\s*/g) || [text]).map(s => s.trim()).filter(Boolean);
+    const paras = [];
+    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(' '));
+    return paras.map(p => '<p>' + esc(p) + '</p>').join('') || esc(text);
+  }
+  function renderPresenter(index) {
+    const doc = getPresenterDoc();
+    if (!doc) return;
+    const d = slidesData[index];
+    const token = ++presenterRenderToken;
+    const dotsHtml = slidesData.map((s, i) =>
+      `<button class="p-dot${i === index ? ' active' : ''}" data-slide="${i}" style="--p-dot:${s.tagColor}"></button>`
+    ).join('');
+    doc.body.innerHTML = `
+      <header>
+        <div>
+          <div class="eyebrow">🖥 Пульт докладчика · Vericoding</div>
+          <div class="counter">Слайд ${index + 1} из ${slidesData.length}</div>
+        </div>
+        <button id="closeBtn" class="close" title="Закрыть пульт">✕</button>
+      </header>
+      <main class="notes">
+        <div class="pane-label">Точный текст озвучки &amp; Тезисы</div>
+        <div class="pv-tag" style="color:${d.tagColor}">${d.icon} ${d.tag}</div>
+        <h2>${d.title}</h2>
+        <div id="narrContent" class="pv-text">Загрузка текста озвучки…</div>
+        <div class="pv-callout">${d.callout}</div>
+        ${PRESENTER_TIPS[index] ? `<div class="pv-tip"><span class="pv-tip-label">🎛 Что на сцене</span>${PRESENTER_TIPS[index]}</div>` : ''}
+      </main>
+      <footer>
+        <button id="pPrevBtn" class="p-nav-btn" ${index === 0 ? 'disabled' : ''}>‹</button>
+        <div class="dots-wrap">${dotsHtml}</div>
+        <button id="pNextBtn" class="p-nav-btn" ${index === slidesData.length - 1 ? 'disabled' : ''}>›</button>
+      </footer>
+    `;
+    doc.getElementById('closeBtn').onclick = () => presenterWindow.close();
+    doc.getElementById('pPrevBtn').onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+    doc.getElementById('pNextBtn').onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+    doc.querySelectorAll('[data-slide]').forEach(b => {
+      b.onclick = () => goToSlide(Number(b.dataset.slide), { forceSpeak: voiceToggle.checked });
+    });
+    fetch(`narration/vericoding/${index}.json`)
+      .then(r => { if (!r.ok) throw new Error('error'); return r.json(); })
+      .then(p => {
+        if (token !== presenterRenderToken) return;
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = formatNarrationHtml(p.text);
+      })
+      .catch(() => {
+        const dDoc = getPresenterDoc();
+        const nEl = dDoc && dDoc.getElementById('narrContent');
+        if (nEl) nEl.innerHTML = `<p>${d.desc}</p>`;
+      });
+  }
+  function updatePresenterWindow(index) { if (getPresenterDoc()) renderPresenter(index); }
+
+  async function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); renderPresenter(currentSlide); return; }
+    if ('documentPictureInPicture' in window) {
+      try {
+        presenterWindow = await documentPictureInPicture.requestWindow({
+          width: Math.max(380, Math.min(540, Math.round(screen.availWidth * 0.26))),
+          height: Math.max(540, Math.round(screen.availHeight * 0.88)),
+          disallowReturnToOpener: true
+        });
+      } catch (e) { presenterWindow = null; }
+    }
+    if (!presenterWindow) presenterWindow = window.open('', 'vb-presenter', 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
+    if (!presenterWindow) { alert('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для пульта.'); return; }
+    presenterWindow.document.write(`<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Пульт докладчика — Vericoding</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: #061019; color: #bfd6e0; font-family: 'Inter', -apple-system, sans-serif; }
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #0a1a24; border-bottom: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .eyebrow { color: #22d3ee; font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .counter { margin-top: 4px; color: #7f97a6; font-size: 11px; font-weight: 700; }
+    .close { width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    .close:hover { background: rgba(34,211,238,.25); color: #fff; }
+    .notes { flex: 1; padding: 24px 22px 90px; overflow-y: auto; }
+    .pane-label { margin-bottom: 16px; color: #5f7686; font-size: 10px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    .pv-tag { font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    h2 { margin: 10px 0 18px; color: #eef7fb; font-size: 24px; line-height: 1.2; font-weight: 800; }
+    .pv-text { font-size: 16px; line-height: 1.65; color: #d4e6ef; }
+    .pv-text p { margin-bottom: 14px; }
+    .pv-text p:first-child { font-weight: 600; color: #f0f9ff; }
+    .pv-callout { margin-top: 18px; padding: 14px 16px; border-radius: 10px; background: rgba(168,85,247,.1); border-left: 4px solid #a855f7; color: #e2ccfb; font-size: 14px; line-height: 1.5; }
+    .pv-tip { margin-top: 14px; padding: 13px 15px; border-radius: 10px; background: rgba(16,185,129,.08); border: 1px dashed rgba(16,185,129,.4); color: #bdeed7; font-size: 13.5px; line-height: 1.55; }
+    .pv-tip b { color: #eafff5; font-weight: 700; }
+    .pv-tip-label { display: block; margin-bottom: 6px; color: #10b981; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #0a1a24; border-top: 1px solid rgba(34,211,238,.25); z-index: 10; }
+    .p-nav-btn { width: 36px; height: 36px; font-size: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,.1); background: #11202b; color: #a5bccb; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .p-nav-btn:hover:not(:disabled) { border-color: #22d3ee; color: #fff; background: rgba(34,211,238,.2); }
+    .p-nav-btn:disabled { opacity: .25; cursor: default; }
+    .dots-wrap { flex: 1; display: flex; justify-content: center; gap: 6px; }
+    .p-dot { width: 8px; height: 8px; border-radius: 50%; border: 0; background: #2b3f4d; cursor: pointer; transition: all 0.2s; }
+    .p-dot.active { width: 22px; border-radius: 4px; background: var(--p-dot); box-shadow: 0 0 10px var(--p-dot); }
+  </style>
+</head>
+<body></body>
+</html>`);
+    presenterWindow.document.close();
+    presenterWindow.addEventListener('pagehide', () => { btnPresenter.textContent = '🖥 Пульт'; });
+    btnPresenter.textContent = '🖥 Пульт открыт';
+    renderPresenter(currentSlide);
+    presenterWindow.focus();
+  }
+
+  // ── Event Listeners ──
+  btnPrev.onclick = () => goToSlide(currentSlide - 1, { forceSpeak: voiceToggle.checked });
+  btnNext.onclick = () => goToSlide(currentSlide + 1, { forceSpeak: voiceToggle.checked });
+  btnRestart.onclick = () => goToSlide(0, { forceSpeak: voiceToggle.checked });
+  btnPresenter.onclick = openPresenter;
+  btnPlay.onclick = () => {
+    if (isPlaying && ttsAudio) { ttsAudio.pause(); isPlaying = false; btnPlay.textContent = '▶ Играть'; }
+    else if (!isPlaying && ttsAudio) { ttsAudio.play(); isPlaying = true; btnPlay.textContent = '⏸ Пауза'; }
+    else speakSlide(currentSlide);
+  };
+  voiceToggle.addEventListener('change', () => {
+    if (!voiceToggle.checked && ttsAudio) {
+      ttsAudio.pause(); ttsAudio = null; isPlaying = false;
+      btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%';
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); btnNext.click(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); btnPrev.click(); }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); openPresenter(); }
+  });
+
+  // ── Boot ──
+  resizeCanvas();
+  buildUI();
+  const hashSlide = parseInt((location.hash || '').replace('#', ''), 10);
+  const startIndex = Number.isInteger(hashSlide) && hashSlide >= 1 && hashSlide <= slidesData.length ? hashSlide - 1 : 0;
+  currentSlide = startIndex;
+  initScene(startIndex);
+  updateUI();
+  prefetch(startIndex);
+  prefetch(startIndex + 1);
+  requestAnimationFrame(animate);
+  /* ── remote slide sync (active only with ?room=) ── */
+  if (window.PrezaSync && window.PrezaSync.active) {
+    var __prezaApplying = false, __lastApplied = '';
+    var __sync = window.PrezaSync.attach({
+      deckId: 'vericoding',
+      getState: function () { return { slide: currentSlide, voiceOn: !!voiceToggle.checked, playing: !!isPlaying }; },
+      applyState: function (s) {
+        var __k = s.slide + '|' + (!!s.voiceOn) + '|' + (!!s.playing);
+        if (__k === __lastApplied) return;
+        __lastApplied = __k;
+        __prezaApplying = true;
+        try {
+          if (typeof s.voiceOn === 'boolean') voiceToggle.checked = s.voiceOn;
+          if (typeof s.slide === 'number' && s.slide !== currentSlide) {
+            goToSlide(s.slide, { forceSpeak: !!(s.voiceOn && s.playing) });
+          } else {
+            if (!s.voiceOn && ttsAudio) { ttsAudio.pause(); ttsAudio = null; isPlaying = false; btnPlay.textContent = '▶ Играть'; progressBar.style.width = '0%'; }
+            else if (s.playing && !isPlaying) { if (ttsAudio) { ttsAudio.play(); isPlaying = true; btnPlay.textContent = '⏸ Пауза'; } else if (s.voiceOn) { speakSlide(currentSlide); } }
+            else if (!s.playing && isPlaying && ttsAudio) { ttsAudio.pause(); isPlaying = false; btnPlay.textContent = '▶ Играть'; }
+          }
+        } finally { __prezaApplying = false; }
+      }
+    });
+    var __pub = function () { if (!__prezaApplying) __sync.publish(); };
+    var __origGo = goToSlide; goToSlide = function (i, o) { __origGo(i, o); __pub(); };
+    var __origPlay = btnPlay.onclick; btnPlay.onclick = function (e) { if (__origPlay) __origPlay.call(this, e); __pub(); };
+    voiceToggle.addEventListener('change', __pub);
+    __pub();
+  }
+})();
+</script>
+</body>
+</html>
