@@ -634,7 +634,7 @@
         <button id="btn-play" class="ctl-btn primary">▶ Играть</button>
         <button id="btn-restart" class="ctl-btn ghost icon-only" title="В начало">↺</button>
         <div class="deck-progress"><div class="deck-progress-fill" id="progress-bar"></div></div>
-        <span class="slide-counter-badge" id="slide-counter">1 / 9</span>
+        <span class="slide-counter-badge" id="slide-counter">1 / 8</span>
         <label class="voice-toggle-label" title="Озвучка (TTS)" aria-label="Голос">
           <input type="checkbox" id="voice-toggle">
           <span class="v-icon">🗣️</span>
@@ -812,7 +812,7 @@
     }
   }
 
-  const CATS = [['product_bug', '🐞 баг продукта', 'red'], ['flaky', '🎲 флаки', 'amber'], ['environment', '🌐 окружение', 'blue'], ['test_infra', '🧱 инфраструктура', 'violet']];
+  const CATS = [['product_bug', '🐞 баг продукта', 'red'], ['flaky', '🎲 нестабильные', 'amber'], ['environment', '🌐 окружение', 'blue'], ['test_infra', '🧱 сами тесты', 'violet']];
   const ICON = { jira_create: '🐞', jira_comment: '💬', quarantine: '🧪', fix_ci: '🛠' };
   function renderResult(r) {
     if (!r) return;
@@ -823,10 +823,10 @@
     $('lv-result').innerHTML = `
       <div class="lv-head">${esc(r.headline)}</div>
       <div class="lv-cats">${CATS.map(c => `<div class="lv-cat ${c[2]}"><b>${by[c[0]] || 0}</b><span>${c[1]}</span></div>`).join('')}</div>
-      <div class="lv-sub">Jira · dry-run</div>
+      <div class="lv-sub">Jira · черновики</div>
       <div class="lv-acts">${(r.actions || []).slice(0, 5).map(a => `<div class="lv-act"><span>${ICON[a.type] || '•'}</span><div><b>${esc(a.title)}</b><i>${esc(a.type)}${a.target ? ' · ' + esc(a.target) : ''}</i></div></div>`).join('') || '<div class="lv-wait">действий нет</div>'}</div>
       <div class="lv-sub">Telegram · QA-чат</div>
-      <div class="lv-tg"><pre>${esc(r.digest)}</pre><em>✓ отправлено · dry-run</em></div>
+      <div class="lv-tg"><pre>${esc(r.digest)}</pre><em>✓ отправлено · демо-режим</em></div>
       <div class="lv-usage">${u.steps || 0} шагов · ${((u.tokens || {}).input || 0) + ((u.tokens || {}).output || 0)} токенов · $${(u.cost || 0).toFixed(3)} · ${esc(r.model || '')}</div>`;
     if (window.__aiTriageOnReport) window.__aiTriageOnReport(r);
   }
@@ -944,59 +944,60 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // SLIDES DATA
   // ═══════════════════════════════════════════════════════════════════════════
-  const slidesData = [
+  // hidden: true — слайд есть в коде, но не показывается (вместе с подсказкой пульта и озвучкой по порядку).
+  const ALL_SLIDES = [
     {
-      icon: '🌅', tag: 'Утро QA · 10 дней прогонов по расписанию', tagColor: RED, storyLabel: 'Проблема', mode: 'ci_problem',
-      caption: '41 красный прогон из 60 — а видимая причина есть только у 14',
-      sceneNote: 'Каждая клетка — прогон по расписанию с 20 по 29 октября. Кнопка «▶ Разобрать» раскладывает красные по реальным причинам.',
-      title: '68% красного — сколько из этого сигнал?',
-      desc: `За 10 дней <strong>60 прогонов</strong> по расписанию, из них <span class="hl-red">41 красный</span>. Упавшие тесты в отчёте GitLab видны только у <strong>14</strong>. Остальные — <span class="hl-amber">таймаут джобы</span> при прошедших тестах, <span class="hl-amber">отчёт не собрался</span> или <span class="hl-violet">отчёт есть, но GitLab его не показал</span>. Каждое утро человек тратит время, чтобы понять, где настоящие проблемы.`,
-      callout: `<b>Идея:</b> пусть это делает агент — каждое утро, по расписанию, в том же CI, где идут тесты.`,
+      icon: '🌅', tag: 'Утро QA · 10 дней прогонов', tagColor: RED, storyLabel: 'Проблема', mode: 'ci_problem',
+      caption: '41 красный из 60 — а видимая причина есть только у 14',
+      sceneNote: 'Каждая клетка — один прогон по расписанию за 20–29 октября. «▶ Разобрать» покажет настоящие причины.',
+      title: '68% прогонов красные. Где реальные проблемы?',
+      desc: `За 10 дней — <strong>60 прогонов</strong> тестов по расписанию, из них <span class="hl-red">41 красный</span>. Но упавшие тесты видны только в <strong>14</strong>. Остальные красные по другим причинам: <span class="hl-amber">джоба не уложилась по времени</span>, <span class="hl-amber">отчёт не собрался</span> или <span class="hl-violet">GitLab его не показал</span>. Каждое утро кто-то тратит время, чтобы в этом разобраться.`,
+      callout: `<b>Идея:</b> пусть это каждое утро делает ИИ-агент — прямо в CI, по расписанию.`,
       calloutClass: 'red'
     },
     {
-      icon: '📰', tag: 'Статья на Хабре · рецепт', tagColor: CY, storyLabel: 'Рецепт', mode: 'ci_recipe',
-      caption: 'Скилл → строгий конфиг → секреты → джоба → расписание',
-      sceneNote: 'Автор статьи — QA Tech Lead: агент на opencode в GitLab CI разбирает ночной прогон и пишет отчёт в чат.',
-      title: 'Агент в CI по расписанию: рецепт',
-      desc: `<span class="hl-cyan">1. Скилл:</span> задачу проходят руками вместе с агентом, затем агент оформляет её в <code>SKILL.md</code>. <span class="hl-cyan">2. Конфиг:</span> модель, агент и права заданы явно. <span class="hl-cyan">3. Секреты:</span> переменные CI, отдельный токен на задачу. <span class="hl-cyan">4. Джоба:</span> <code>opencode run</code> с лимитом шагов и таймаутом. <span class="hl-cyan">5. Расписание:</span> pipeline schedule.`,
-      callout: `<b>Ключевое:</b> агент — это просто ещё одна джоба. Никаких серверов и подписок: CI уже умеет запускать по расписанию.`,
+      icon: '📰', tag: 'Статья на Хабре · суть', tagColor: CY, storyLabel: 'Статья', mode: 'ci_recipe',
+      caption: 'Агент в CI — это просто ещё одна джоба по расписанию',
+      sceneNote: 'Пять шагов из статьи: от ручной сессии с агентом до запуска по расписанию.',
+      title: 'Идея статьи: агент — обычная джоба',
+      desc: `Автор, QA Tech Lead, отдаёт ИИ-агенту <strong>простую повторяющуюся работу</strong>: каждое утро агент в GitLab CI разбирает ночной прогон тестов и пишет отчёт в чат. Рецепт: <span class="hl-cyan">1</span> пройти задачу вместе с агентом и сохранить её как инструкцию — <strong>скилл</strong>, отладить локально; <span class="hl-cyan">2</span> явно задать модель и права; <span class="hl-cyan">3</span> отдельный токен с минимумом прав; <span class="hl-cyan">4</span> джоба <strong>с лимитом шагов</strong> и времени; <span class="hl-cyan">5</span> расписание.`,
+      callout: `<b>Предупреждение автора:</b> без жёстких рамок отчёты превращаются в «нейрослоп» — «эссе с таблицами» вместо пары строк.`,
       calloutClass: 'cyan'
     },
     {
-      icon: '🧭', tag: 'Как устроено у нас', tagColor: BLUE, storyLabel: 'Схема', mode: 'ci_arch',
-      caption: 'Скрипт собирает факты, агент делает выводы, публикация — отдельным шагом',
-      sceneNote: 'Точки бегут слева направо: расписание → сбор → агент → публикация → этот слайд.',
-      title: 'Схема: факты отдельно, выводы отдельно',
-      desc: `<span class="hl-blue">Сбор</span> — обычный скрипт: прогоны за сутки и история за 10 дней из <strong>junit-артефактов</strong>. <span class="hl-violet">Агент</span> (opencode + <code>gpt-5.4-mini</code>) читает только этот файл и раскладывает красное по категориям. <span class="hl-emerald">Публикация</span> — снова скрипт: Jira и Telegram в режиме <strong>dry-run</strong>, отчёт в артефакты и зашифрованный поток на слайд.`,
-      callout: `<b>Почему так:</b> цифры считает код, а не модель. Модель отвечает только за суждение — что здесь шум, а что баг.`,
+      icon: '🧭', tag: 'Как сделали у нас', tagColor: BLUE, storyLabel: 'Схема', mode: 'ci_arch',
+      caption: 'Скрипт собирает факты, агент делает выводы',
+      sceneNote: 'Слева направо: расписание → сбор фактов → агент → публикация → этот слайд.',
+      title: 'Как у нас: код считает, агент решает',
+      desc: `<span class="hl-blue">Скрипт</span> собирает факты: какие прогоны упали за сутки и что падало за 10 дней. <span class="hl-violet">Агент</span> читает эти факты и решает, что из красного — реальная проблема, а что шум. <span class="hl-emerald">Второй скрипт</span> оформляет результат: черновики тикетов в Jira, сообщение в Telegram и отчёт.`,
+      callout: `<b>Почему так:</b> цифры считает код — они всегда точные. Модель отвечает только за выводы.`,
       calloutClass: 'blue'
     },
     {
-      icon: '🛡', tag: 'Ограничения и безопасность', tagColor: EM, storyLabel: 'Защита', mode: 'ci_guard',
-      caption: '"*": "deny" — агенту разрешено только читать',
-      sceneNote: 'Вокруг агента — что ему разрешено (зелёное) и что запрещено (красное).',
+      icon: '🛡', tag: 'Безопасность', tagColor: EM, storyLabel: 'Защита', mode: 'ci_guard',
+      caption: 'Всё запрещено, кроме чтения',
+      sceneNote: 'Зелёное — агенту разрешено, красное — запрещено.',
       title: 'Агенту можно только читать',
-      desc: `Права в <code>opencode.json</code> по принципу статьи: <span class="hl-red">всё запрещено</span>, разрешены <span class="hl-emerald">read, grep, glob, skill</span>. Нет bash, нет записи файлов, нет сети, <code>.env</code> закрыт. <strong>steps: 25</strong>, <strong>timeout: 10 минут</strong>. GitLab — через <code>CI_JOB_TOKEN</code> только на чтение, ключ модели — masked-переменная.`,
-      callout: `<b>Публичный брокер:</b> поток на слайд шифруется (AES-256-GCM + RSA-OAEP). Читать его может только браузер с приватным ключом.`,
+      desc: `Как в статье: <span class="hl-red">всё, что не разрешено явно, — запрещено</span>. Агент может только <span class="hl-emerald">читать файлы и искать по ним</span>. Он не запускает команды, не меняет файлы и не ходит в интернет. Лимиты: <strong>25 шагов</strong> и <strong>10 минут</strong>. Токен GitLab — только на чтение.`,
+      callout: `<b>Трансляция на слайд</b> идёт через публичный сервер, поэтому она зашифрована: прочитать её может только браузер с нашим ключом.`,
       calloutClass: 'emerald'
     },
     {
-      icon: '📜', tag: 'Скилл nightly-triage', tagColor: VIO, storyLabel: 'Скилл', mode: 'ci_skill',
-      caption: 'Четыре корзины: баг продукта, флаки, окружение, инфраструктура тестов',
-      sceneNote: 'Красные прогоны падают в одну из четырёх корзин по правилам из SKILL.md.',
+      icon: '📜', tag: 'Скилл · инструкция для агента', tagColor: VIO, storyLabel: 'Скилл', mode: 'ci_skill',
+      caption: 'Четыре корзины: баг, нестабильный тест, окружение, сами тесты',
+      sceneNote: 'Красные прогоны раскладываются по четырём корзинам по правилам из SKILL.md.',
       title: 'Скилл: куда положить каждый красный',
-      desc: `<span class="hl-red">product_bug</span> — новое стабильное падение проверки. <span class="hl-amber">flaky</span> — тест падает в разные дни, «Max N retries». <span class="hl-blue">environment</span> — 502/504, сеть, стенд. <span class="hl-violet">test_infra</span> — таймаут при прошедших тестах, Jest не завершился, отчёт не собрался. Для каждой категории — своё действие: тикет, комментарий, карантин, правка CI.`,
-      callout: `<b>Против «нейрослопа»:</b> дайджест не длиннее 10 строк, каждая строка — факт и число, без «рекомендуется обратить внимание».`,
+      desc: `<span class="hl-red">Баг продукта</span> — новая ошибка, которой раньше не было → тикет. <span class="hl-amber">Нестабильный тест</span> — падает то в один день, то в другой → карантин. <span class="hl-blue">Окружение</span> — стенд или сеть недоступны → комментарий. <span class="hl-violet">Сами тесты</span> — джоба зависла или отчёт не собрался → правка CI.`,
+      callout: `<b>Против «нейрослопа»:</b> сообщение — не больше 10 строк, в каждой факт и число.`,
       calloutClass: 'violet'
     },
     {
       icon: '⚡', tag: 'Живое демо', tagColor: AMB, storyLabel: 'Демо', mode: 'ci_live',
-      caption: 'Настоящий пайплайн в GitLab — ход работы агента прямо на слайде',
+      caption: 'Настоящий запуск в GitLab — ход работы агента прямо на слайде',
       sceneNote: '',
       title: 'Демо: запускаем агента',
-      desc: `Кнопка <strong>▶ Запустить</strong> создаёт пайплайн в GitLab на ветке <code>ai-triage-demo</code>. Дальше всё вживую: <span class="hl-blue">этапы джобы</span>, <span class="hl-violet">терминал агента</span> — что он читает и о чём думает, и <span class="hl-emerald">результат</span>: категории, тикеты Jira (dry-run) и сообщение в Telegram.`,
-      callout: `<b>Если сеть подведёт:</b> «⟲ Replay» проигрывает записанный настоящий прогон — те же события, в ускоренном темпе.`,
+      desc: `Кнопка <strong>▶ Запустить</strong> создаёт настоящий запуск в GitLab. На экране видно <span class="hl-blue">этапы</span>, <span class="hl-violet">что делает агент</span> — какие файлы читает и что решает, — и <span class="hl-emerald">результат</span>: категории, черновики тикетов и сообщение в Telegram. Около полутора минут.`,
+      callout: `<b>Если сеть подведёт:</b> «⟲ Replay» покажет записанный настоящий запуск в ускоренном темпе.`,
       calloutClass: 'amber'
     },
     {
@@ -1004,42 +1005,45 @@
       caption: 'Из красного остаётся то, что действительно требует людей',
       sceneNote: 'Слева — категории за сутки, справа — что агент предлагает сделать.',
       title: 'Что нашёл агент',
-      desc: `Главные находки на реальных данных: <span class="hl-violet">Git_call</span> каждый день красный по таймауту — Jest не завершается. <span class="hl-violet">V2 part1</span>: GitLab показывает «0 тестов», а в junit <strong>10 992 теста и 3 падения</strong> — отчёт слишком большой. <span class="hl-amber">tacts</span> падает каждый день на ожидании счётчика.`,
-      callout: `<b>Ценность:</b> из «41 красного» — короткий список того, что нужно чинить, и кому.`,
+      desc: `<span class="hl-violet">Git_call</span> красный каждый день, хотя тесты проходят: процесс не завершается, и джобу останавливает лимит в 1 час. <span class="hl-violet">V2 part1</span>: GitLab показывает «0 тестов», а на деле их почти 11 000, и 3 упали — этих падений никто не видел. <span class="hl-amber">tacts</span> падает каждый день: тест не дожидается обновления счётчика.`,
+      callout: `<b>Итог:</b> вместо «41 красного» — короткий список: что чинить и кому.`,
       calloutClass: 'emerald'
     },
     {
-      icon: '🚀', tag: 'Дальше', tagColor: EM, storyLabel: 'Итоги', mode: 'ci_end',
-      caption: 'Расписание уже есть, агент — это ещё одна джоба',
-      sceneNote: 'Три шага, чтобы перейти от демо к ежедневной работе.',
+      icon: '🚀', tag: 'Итоги', tagColor: EM, storyLabel: 'Итоги', mode: 'ci_end',
+      caption: 'Начать с чтения и черновиков',
+      sceneNote: 'Три шага от демо к ежедневной работе.',
       title: 'Итоги и следующие шаги',
-      desc: `<span class="hl-emerald">1.</span> Включить расписание в будни в 10:15 — после утренней волны прогонов. <span class="hl-amber">2.</span> Снять dry-run: реальные комментарии и тикеты в Jira, дайджест в QA-чат. <span class="hl-violet">3.</span> Следующие задачи для агента: гигиена Jira, готовность релиза, проверка стендов по утрам.`,
-      callout: `<b>Принцип:</b> начинать с чтения и dry-run, права на запись — только после того, как отчётам начали доверять.`,
+      desc: `<span class="hl-emerald">1.</span> Запускать каждый будний день в 10:15 — после утренних прогонов. <span class="hl-amber">2.</span> Перейти от черновиков к настоящим тикетам в Jira и сообщениям в QA-чат. <span class="hl-violet">3.</span> Дать агенту новые задачи: проверка задач в Jira, готовность релиза, состояние стендов по утрам.`,
+      callout: `<b>Принцип:</b> сначала только чтение и черновики. Права на запись — когда отчётам начнут доверять.`,
       calloutClass: 'emerald'
     },
     {
+      hidden: true,
       icon: '🛠', tag: 'Инструкция · как подключить у себя', tagColor: CY, storyLabel: 'Настройка', mode: 'ci_setup',
       caption: 'Шесть шагов — и агент разбирает прогоны вашего проекта каждое утро',
       sceneNote: 'Подробно — в scripts/ai-triage/README.md в ветке ai-triage-demo.',
       title: 'Как подключить на своём проекте',
-      desc: `<span class="hl-cyan">1.</span> Скопировать <code>SKILL.md</code> и <code>scripts/ai-triage/</code>. <span class="hl-cyan">2.</span> Переменные CI: <code>OPENAI_KEY</code> и <code>TRIAGE_GITLAB_TOKEN</code> (Project Access Token, <strong>read_api</strong>). <span class="hl-cyan">3.</span> Указать свою джобу с тестами и путь к junit. <span class="hl-cyan">4.</span> Добавить джобу <code>ai-triage</code>. <span class="hl-cyan">5.</span> Расписание в будни 10:15 с <code>AI_TRIAGE=true</code>. <span class="hl-cyan">6.</span> Прогнать вручную и проверить отчёт.`,
-      callout: `<b>Нужен Maintainer</b> — только для переменных и расписания. Остальное — обычный MR. Первые недели — только dry-run.`,
+      desc: `<span class="hl-cyan">1.</span> Скопировать <code>SKILL.md</code> и <code>scripts/ai-triage/</code>. <span class="hl-cyan">2.</span> Переменные CI: <code>OPENAI_KEY</code> и <code>TRIAGE_GITLAB_TOKEN</code> (только чтение). <span class="hl-cyan">3.</span> Указать свою джобу с тестами и путь к junit. <span class="hl-cyan">4.</span> Добавить джобу <code>ai-triage</code>. <span class="hl-cyan">5.</span> Расписание в будни 10:15. <span class="hl-cyan">6.</span> Прогнать вручную и проверить отчёт.`,
+      callout: `<b>Нужен Maintainer</b> — только для переменных и расписания. Остальное — обычный MR.`,
       calloutClass: 'cyan'
     }
   ];
 
-  // Пульт-only подсказки докладчику (не входят в озвучку).
-  const PRESENTER_TIPS = [
-    'Кнопка <b>«▶ Разобрать»</b> перекрашивает красные клетки по реальным причинам. Цифры за 20–29 октября: 60 прогонов, 41 красный, у 14 видны упавшие тесты.',
-    'Пять шагов из статьи. Подчеркни: у автора GitLab CI + opencode + свои модели, у нас то же самое, только модель через OPENAI_KEY, который уже есть в проекте для pr-agent.',
-    'Кнопка <b>«▶ Прогнать»</b> запускает точки по схеме. Мысль: скрипт считает, модель судит. Поэтому числа в отчёте всегда сходятся с GitLab.',
-    'Зелёное — разрешено, красное — запрещено. Скажи про шифрование: брокер публичный, но в нём только шифр.',
-    'Кнопка <b>«▶ Сортировать»</b> — красные прогоны падают в корзины. Каждая корзина — своё действие.',
-    'Нужны: VPN, GitLab-токен и приватный ключ в «🔑 Настройки». Нажми <b>▶ Запустить</b>: ~30 с сбор, ~20–40 с агент. Если сеть не работает — <b>⟲ Replay</b>.',
-    'Если демо прошло, здесь видны данные этого прогона. Главная находка — V2 part1: GitLab показывает 0 тестов, а падения есть.',
-    'Три шага от демо к ежедневной работе. Принцип — сначала чтение и dry-run, потом права на запись.',
-    'Инструкция для команд. Подробности — README в ветке ai-triage-demo. Maintainer нужен только для переменных и расписания. Финал — спасибо и вопросы.'
+  // Пульт-only подсказки докладчику (не входят в озвучку); порядок — как в ALL_SLIDES.
+  const ALL_TIPS = [
+    'Кнопка <b>«▶ Разобрать»</b> перекрашивает красные клетки по настоящим причинам. Цифры за 20–29 октября: 60 прогонов, 41 красный, упавшие тесты видны у 14.',
+    'Суть статьи: агенту — простую повторяющуюся работу, в CI, по расписанию. Автор: польза — «может, даже производительность, но это не точно», и задача — вывести ИИ «из тени». У нас то же, только модель через OPENAI_KEY, который уже есть в проекте.',
+    'Кнопка <b>«▶ Прогнать»</b> запускает точки по схеме. Мысль: скрипт считает, модель судит — поэтому цифры в отчёте всегда сходятся с GitLab.',
+    'Зелёное — разрешено, красное — запрещено. Автор: «Крайне важно ограничить количество шагов для агента».',
+    'Кнопка <b>«▶ Сортировать»</b> — красные прогоны падают в корзины. У каждой корзины своё действие.',
+    'Нужен VPN и ссылка докладчика. Нажми <b>▶ Запустить</b>: ~15 с сбор, ~40–60 с агент. Если сеть не работает — <b>⟲ Replay</b>.',
+    'Если демо прошло, здесь данные этого запуска. Главная находка — V2 part1: GitLab показывает 0 тестов, а падения есть.',
+    'Три шага. Принцип — сначала чтение и черновики, потом права на запись. Финал — спасибо и вопросы.',
+    'Инструкция для команд. Подробности — README в ветке ai-triage-demo.'
   ];
+  const slidesData = ALL_SLIDES.filter(s => !s.hidden);
+  const PRESENTER_TIPS = ALL_TIPS.filter((_, i) => !ALL_SLIDES[i].hidden);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CANVAS ENGINE
@@ -1202,10 +1206,10 @@
     return cells;
   })();
   const RECIPE = [
-    ['📜', 'Скилл', 'SKILL.md', 'задачу один раз проходят руками'],
+    ['📜', 'Скилл', 'SKILL.md', 'задачу один раз проходят с агентом'],
     ['⚙️', 'Конфиг', 'opencode.json', 'модель, агент, права'],
     ['🔑', 'Секреты', '$OPENAI_KEY', 'переменные CI, токен на задачу'],
-    ['🧱', 'Джоба', 'opencode run', 'steps + timeout'],
+    ['🧱', 'Джоба', 'opencode run', 'лимит шагов и времени'],
     ['⏰', 'Расписание', '15 10 * * 1-5', 'pipeline schedule']
   ];
   const ARCH = [
@@ -1219,9 +1223,9 @@
   const GUARD_DENY = ['bash', 'edit', 'write', 'webfetch', '.env', 'external_dir'];
   const BINS = [
     { k: 'product_bug', c: RED, t: 'Баг продукта', a: '→ тикет в Jira' },
-    { k: 'flaky', c: AMB, t: 'Флаки', a: '→ карантин' },
+    { k: 'flaky', c: AMB, t: 'Нестабильные', a: '→ карантин' },
     { k: 'environment', c: BLUE, t: 'Окружение', a: '→ комментарий' },
-    { k: 'test_infra', c: VIO, t: 'Инфраструктура', a: '→ правка CI' }
+    { k: 'test_infra', c: VIO, t: 'Сами тесты', a: '→ правка CI' }
   ];
   const BALLS = ['test_infra', 'flaky', 'product_bug', 'test_infra', 'environment', 'flaky', 'test_infra', 'product_bug', 'test_infra', 'flaky'];
   const SETUP = [
@@ -1234,8 +1238,8 @@
   ];
   const END3 = [
     { n: '1', c: EM, t: 'Включить расписание', s: 'будни 10:15 — после утренней волны прогонов' },
-    { n: '2', c: AMB, t: 'Снять dry-run', s: 'комментарии и тикеты в Jira, дайджест в QA-чат' },
-    { n: '3', c: VIO, t: 'Новые задачи агенту', s: 'гигиена Jira · готовность релиза · стенды по утрам' }
+    { n: '2', c: AMB, t: 'От черновиков — к делу', s: 'настоящие тикеты в Jira и сообщения в QA-чат' },
+    { n: '3', c: VIO, t: 'Новые задачи агенту', s: 'проверка задач в Jira · готовность релиза · стенды по утрам' }
   ];
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1387,7 +1391,7 @@
     if (appear(t, 6, 0.3) > 0) {
       box(ax - 30, y0 - 36, bw + 60, 26, EM, '', '', { glow: 6, radius: 8 });
       label('read-only · 25 шагов', ax + bw / 2, y0 - 23, EM, 10.5, 800);
-      [['🐞', 'Jira', 'dry-run'], ['✈', 'Telegram', 'dry-run'], ['📄', 'report.json', 'артефакт']].forEach((o, k) => {
+      [['🐞', 'Jira', 'черновик'], ['✈', 'Telegram', 'черновик'], ['📄', 'report.json', 'артефакт']].forEach((o, k) => {
         const ox = px + bw / 2 + (k - 1) * (bw * 0.78), ow = bw * 0.72;
         line(px + bw / 2, y0 + bh, ox, oy, EM, 1.2, [4, 4]);
         box(ox - ow / 2, oy, ow, 58, EM, '', '', { glow: 6 });
@@ -1496,7 +1500,7 @@
       label('🔒 данные прогона видны после демо (нужен ключ)', width / 2, height * 0.08, '#9fb2bf', 12, 700);
       return;
     }
-    const cats = [['product_bug', RED, 'баг продукта'], ['flaky', AMB, 'флаки'], ['environment', BLUE, 'окружение'], ['test_infra', VIO, 'инфраструктура']];
+    const cats = [['product_bug', RED, 'баг продукта'], ['flaky', AMB, 'нестабильные'], ['environment', BLUE, 'окружение'], ['test_infra', VIO, 'сами тесты']];
     const by = rep.totals.by_category || {};
     label(`${rep.totals.red} красных из ${rep.totals.runs} за сутки`, lx, ly, '#fff', 17, 900, 'left');
     cats.forEach((c, i) => {
@@ -1507,7 +1511,7 @@
     });
     wrap(rep.headline || '', lx + lw / 2, ly + 40 + 4 * 46 + 16, lw, 17, AMB, 12.5, 800);
     const rx = lx + lw + width * 0.07, rw = width - rx - width * 0.05;
-    label('что предлагает агент (dry-run)', rx, ly, EM, 13, 800, 'left');
+    label('что предлагает агент (черновики)', rx, ly, EM, 13, 800, 'left');
     (rep.actions || []).slice(0, 4).forEach((a, i) => {
       const ap = appear(t, i, 0.35); if (ap <= 0) return;
       const y = ly + 22 + i * 84, ic = { jira_create: '🐞', jira_comment: '💬', quarantine: '🧪', fix_ci: '🛠' }[a.type] || '•';
@@ -1537,7 +1541,7 @@
     });
     const by = y0 + 3 * (rh + gap) + 4;
     box(x0, by, w, 48, EM, '', '', { glow: 14 });
-    label('сначала чтение и dry-run · права на запись — потом', x0 + w / 2, by + 24, '#fff', 13, 800);
+    label('сначала чтение и черновики · права на запись — потом', x0 + w / 2, by + 24, '#fff', 13, 800);
     label('агент — это ещё одна джоба', width / 2, height * 0.07, EM, 14, 800);
   }
 
@@ -1607,9 +1611,9 @@
     ci_recipe:   [[CY, 'шаг рецепта']],
     ci_arch:     [[BLUE, 'скрипт'], [VIO, 'агент'], [EM, 'публикация'], [AMB, 'слайд']],
     ci_guard:    [[EM, 'разрешено'], [RED, 'запрещено']],
-    ci_skill:    [[RED, 'product_bug'], [AMB, 'flaky'], [BLUE, 'environment'], [VIO, 'test_infra']],
-    ci_found:    [[RED, 'баг'], [AMB, 'флаки'], [BLUE, 'окружение'], [VIO, 'инфраструктура']],
-    ci_end:      [[EM, 'шаг'], [AMB, 'dry-run'], [VIO, 'дальше']],
+    ci_skill:    [[RED, 'баг продукта'], [AMB, 'нестабильный тест'], [BLUE, 'окружение'], [VIO, 'сами тесты']],
+    ci_found:    [[RED, 'баг'], [AMB, 'нестабильные'], [BLUE, 'окружение'], [VIO, 'сами тесты']],
+    ci_end:      [[EM, 'шаг'], [AMB, 'черновики'], [VIO, 'дальше']],
     ci_setup:    [[CY, 'файлы'], [AMB, 'секреты'], [EM, 'расписание']]
   };
   const legendEl = document.getElementById('stage-legend');
@@ -1690,7 +1694,7 @@
   let isPlaying = false;
   let ttsAudio = null;
   const preloadPool = {};
-  const NARRATION_VERSION = 'ci-9-20261029-v2';
+  const NARRATION_VERSION = 'ci-8-20261029-v3';
   voiceToggle.checked = false;
 
   function ttsUrl(idx) {
