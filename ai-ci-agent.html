@@ -1009,15 +1009,6 @@
       calloutClass: 'emerald'
     },
     {
-      icon: '🪤', tag: 'Грабли', tagColor: MAG, storyLabel: 'Грабли', mode: 'ci_pitfalls',
-      caption: 'Что мы узнали, пока запускали',
-      sceneNote: 'Шесть граблей, на которые мы наступили по дороге.',
-      title: 'Грабли и цена',
-      desc: `<code>CI_JOB_TOKEN</code> не читает логи и отчёты тестов — <strong>берём junit из артефактов</strong>. GitLab молча <strong>теряет большие отчёты</strong>. Выход в интернет из раннера есть, но брокер публичный — <strong>шифруем</strong>. Без доступа к настройкам CI — работаем в своей ветке. Модель без жёсткого формата пишет «простыни».`,
-      callout: `<b>Цена:</b> один прогон — десятки тысяч токенов <code>gpt-5.4-mini</code>, это центы. Дороже стоит утро инженера.`,
-      calloutClass: 'violet'
-    },
-    {
       icon: '🚀', tag: 'Дальше', tagColor: EM, storyLabel: 'Итоги', mode: 'ci_end',
       caption: 'Расписание уже есть, агент — это ещё одна джоба',
       sceneNote: 'Три шага, чтобы перейти от демо к ежедневной работе.',
@@ -1025,6 +1016,15 @@
       desc: `<span class="hl-emerald">1.</span> Включить расписание в будни в 10:15 — после утренней волны прогонов. <span class="hl-amber">2.</span> Снять dry-run: реальные комментарии и тикеты в Jira, дайджест в QA-чат. <span class="hl-violet">3.</span> Следующие задачи для агента: гигиена Jira, готовность релиза, проверка стендов по утрам.`,
       callout: `<b>Принцип:</b> начинать с чтения и dry-run, права на запись — только после того, как отчётам начали доверять.`,
       calloutClass: 'emerald'
+    },
+    {
+      icon: '🛠', tag: 'Инструкция · как подключить у себя', tagColor: CY, storyLabel: 'Настройка', mode: 'ci_setup',
+      caption: 'Шесть шагов — и агент разбирает прогоны вашего проекта каждое утро',
+      sceneNote: 'Подробно — в scripts/ai-triage/README.md в ветке ai-triage-demo.',
+      title: 'Как подключить на своём проекте',
+      desc: `<span class="hl-cyan">1.</span> Скопировать <code>SKILL.md</code> и <code>scripts/ai-triage/</code>. <span class="hl-cyan">2.</span> Переменные CI: <code>OPENAI_KEY</code> и <code>TRIAGE_GITLAB_TOKEN</code> (Project Access Token, <strong>read_api</strong>). <span class="hl-cyan">3.</span> Указать свою джобу с тестами и путь к junit. <span class="hl-cyan">4.</span> Добавить джобу <code>ai-triage</code>. <span class="hl-cyan">5.</span> Расписание в будни 10:15 с <code>AI_TRIAGE=true</code>. <span class="hl-cyan">6.</span> Прогнать вручную и проверить отчёт.`,
+      callout: `<b>Нужен Maintainer</b> — только для переменных и расписания. Остальное — обычный MR. Первые недели — только dry-run.`,
+      calloutClass: 'cyan'
     }
   ];
 
@@ -1037,8 +1037,8 @@
     'Кнопка <b>«▶ Сортировать»</b> — красные прогоны падают в корзины. Каждая корзина — своё действие.',
     'Нужны: VPN, GitLab-токен и приватный ключ в «🔑 Настройки». Нажми <b>▶ Запустить</b>: ~30 с сбор, ~20–40 с агент. Если сеть не работает — <b>⟲ Replay</b>.',
     'Если демо прошло, здесь видны данные этого прогона. Главная находка — V2 part1: GitLab показывает 0 тестов, а падения есть.',
-    'Грабли из нашего опыта. Про цену — смотри цифры токенов на слайде демо.',
-    'Финал: три шага. Принцип — сначала чтение и dry-run, потом права на запись.'
+    'Три шага от демо к ежедневной работе. Принцип — сначала чтение и dry-run, потом права на запись.',
+    'Инструкция для команд. Подробности — README в ветке ai-triage-demo. Maintainer нужен только для переменных и расписания. Финал — спасибо и вопросы.'
   ];
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1224,13 +1224,13 @@
     { k: 'test_infra', c: VIO, t: 'Инфраструктура', a: '→ правка CI' }
   ];
   const BALLS = ['test_infra', 'flaky', 'product_bug', 'test_infra', 'environment', 'flaky', 'test_infra', 'product_bug', 'test_infra', 'flaky'];
-  const PITFALLS = [
-    { ic: '🔒', c: RED, t: 'CI_JOB_TOKEN не читает логи', s: 'и отчёты тестов → отдельный токен read_api' },
-    { ic: '🫥', c: VIO, t: 'GitLab теряет большие отчёты', s: '10 992 теста → «0 тестов» в UI' },
-    { ic: '⏳', c: AMB, t: 'Зелёные тесты, красная джоба', s: 'Jest не завершается → таймаут 1 ч' },
-    { ic: '📡', c: CY, t: 'Брокер публичный', s: 'шифруем AES-256-GCM + RSA-OAEP' },
-    { ic: '🚧', c: BLUE, t: 'Нет прав Maintainer', s: 'своя ветка + переменная пайплайна' },
-    { ic: '🧻', c: MAG, t: 'Модель любит простыни', s: 'жёсткий формат: ≤ 10 строк' }
+  const SETUP = [
+    { c: CY, t: 'Скопировать файлы', m: '.agents/skills/nightly-triage/  scripts/ai-triage/' },
+    { c: AMB, t: 'Переменные CI (Masked)', m: 'OPENAI_KEY  TRIAGE_GITLAB_TOKEN = read_api' },
+    { c: BLUE, t: 'Указать свои тесты', m: 'TRIAGE_JOB=schedule-run  TRIAGE_JUNIT=report/junit/junit.xml' },
+    { c: VIO, t: 'Джоба ai-triage', m: 'rules: if $AI_TRIAGE == "true"  ·  timeout: 10 minutes' },
+    { c: EM, t: 'Расписание', m: '15 10 * * 1-5  Europe/Kyiv  AI_TRIAGE=true' },
+    { c: MAG, t: 'Проверить вручную', m: 'Run pipeline → triage/report.json · digest.md' }
   ];
   const END3 = [
     { n: '1', c: EM, t: 'Включить расписание', s: 'будни 10:15 — после утренней волны прогонов' },
@@ -1273,7 +1273,7 @@
   // ═══════════════════════════════════════════════════════════════════════════
   const RENDERERS = {
     ci_problem: renderProblem, ci_recipe: renderRecipe, ci_arch: renderArch, ci_guard: renderGuard,
-    ci_skill: renderSkill, ci_live: renderLiveBg, ci_found: renderFound, ci_pitfalls: renderPitfalls, ci_end: renderEnd
+    ci_skill: renderSkill, ci_live: renderLiveBg, ci_found: renderFound, ci_end: renderEnd, ci_setup: renderSetup
   };
   function animate() {
     requestAnimationFrame(animate);
@@ -1521,24 +1521,6 @@
     label(`прогон #${rep.pipeline || '—'} · ${rep.model || ''}`, width / 2, height * 0.06, '#9fb2bf', 11, 700);
   }
 
-  // ── Scene 8: pitfalls ──
-  function renderPitfalls() {
-    const t = tick(0.012);
-    const cols = 3, gap = 16, cw = Math.min(280, (width * 0.9 - gap * 2) / cols), ch = height * 0.24;
-    const x0 = width / 2 - (cw * cols + gap * 2) / 2, y0 = height * 0.15;
-    PITFALLS.forEach((p, i) => {
-      const ap = appear(t, i, 0.25); if (ap <= 0) return;
-      const x = x0 + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
-      ctx.save(); ctx.globalAlpha = ap;
-      box(x, y, cw, ch, p.c, '', '', { glow: 10, bg: 'rgba(6,12,18,0.94)' });
-      label(p.ic, x + cw / 2, y + ch * 0.25, '#fff', 28);
-      wrap(p.t, x + cw / 2, y + ch * 0.52, cw - 28, 17, '#fff', 13.5, 900);
-      wrap(p.s, x + cw / 2, y + ch * 0.78, cw - 28, 15, p.c, 11, 700);
-      ctx.restore();
-    });
-    label('что мы узнали, пока запускали', width / 2, height * 0.07, MAG, 13, 800);
-  }
-
   // ── Scene 9: next steps ──
   function renderEnd() {
     const t = tick(0.012);
@@ -1557,6 +1539,30 @@
     box(x0, by, w, 48, EM, '', '', { glow: 14 });
     label('сначала чтение и dry-run · права на запись — потом', x0 + w / 2, by + 24, '#fff', 13, 800);
     label('агент — это ещё одна джоба', width / 2, height * 0.07, EM, 14, 800);
+  }
+
+  // ── Scene 9: setup checklist ──
+  function renderSetup() {
+    const t = tick(0.012);
+    const w = Math.min(860, width * 0.88), x0 = width / 2 - w / 2, y0 = height * 0.13, rh = Math.min(74, height * 0.105), gap = 10;
+    SETUP.forEach((st, i) => {
+      const ap = appear(t, i, 0.3); if (ap <= 0) return;
+      const y = y0 + i * (rh + gap);
+      ctx.save(); ctx.globalAlpha = ap;
+      box(x0, y, w, rh, st.c, '', '', { glow: 10, bg: 'rgba(6,12,18,0.94)' });
+      ctx.save(); ctx.fillStyle = st.c; ctx.shadowColor = st.c; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(x0 + 36, y + rh / 2, 17, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      label(String(i + 1), x0 + 36, y + rh / 2, '#04070b', 15, 900);
+      label(st.t, x0 + 68, y + rh * 0.34, '#fff', 14, 800, 'left');
+      mono(st.m, x0 + 68, y + rh * 0.7, st.c, 10.5, 'left');
+      ctx.restore();
+    });
+    const by = y0 + SETUP.length * (rh + gap) + 6;
+    if (appear(t, SETUP.length, 0.3) > 0) {
+      box(x0, by, w, 42, CY, '', '', { glow: 12 });
+      mono('README: scripts/ai-triage/README.md · ветка ai-triage-demo', x0 + w / 2, by + 21, '#fff', 11.5, 'center');
+    }
+    label('как подключить на своём проекте', width / 2, height * 0.06, CY, 14, 800);
   }
 
   // ── Effects ──
@@ -1603,8 +1609,8 @@
     ci_guard:    [[EM, 'разрешено'], [RED, 'запрещено']],
     ci_skill:    [[RED, 'product_bug'], [AMB, 'flaky'], [BLUE, 'environment'], [VIO, 'test_infra']],
     ci_found:    [[RED, 'баг'], [AMB, 'флаки'], [BLUE, 'окружение'], [VIO, 'инфраструктура']],
-    ci_pitfalls: [[MAG, 'грабли']],
-    ci_end:      [[EM, 'шаг'], [AMB, 'dry-run'], [VIO, 'дальше']]
+    ci_end:      [[EM, 'шаг'], [AMB, 'dry-run'], [VIO, 'дальше']],
+    ci_setup:    [[CY, 'файлы'], [AMB, 'секреты'], [EM, 'расписание']]
   };
   const legendEl = document.getElementById('stage-legend');
   const stageFade = document.getElementById('stage-fade');
@@ -1684,7 +1690,7 @@
   let isPlaying = false;
   let ttsAudio = null;
   const preloadPool = {};
-  const NARRATION_VERSION = 'ci-9-20261029-v1';
+  const NARRATION_VERSION = 'ci-9-20261029-v2';
   voiceToggle.checked = false;
 
   function ttsUrl(idx) {
