@@ -715,7 +715,7 @@
 (function () {
   'use strict';
   const CFG_KEY = 'aiTriageCfg';
-  const DEFAULTS = { api: '', project: '', ref: 'ai-triage-demo', topic: 'preza/ai-triage/e616020ff8bd', token: '', readToken: '', key: '' };
+  const DEFAULTS = { api: 'https://git.corezoid.com/api/v4', project: '2375', ref: 'ai-triage-demo', topic: 'preza/ai-triage/e616020ff8bd', token: '', readToken: '', key: '' };
   const STAGES = [
     ['queued', 'очередь'], ['started', 'старт'], ['collect', 'сбор фактов'], ['agent', 'агент'], ['publish', 'публикация'], ['done', 'готово']
   ];
@@ -732,6 +732,19 @@
     try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(CFG_KEY) || '{}')); } catch (e) { return Object.assign({}, DEFAULTS); }
   }
   function save() { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {} }
+
+  // Presenter's personal link: …/ai-ci-agent.html#6&cfg=<base64url JSON>. The part after # never
+  // reaches the server; secrets are moved to localStorage and wiped from the address bar at once.
+  (function importFromLink() {
+    const m = location.hash.match(/[#&]cfg=([A-Za-z0-9_-]+)/);
+    if (!m) return;
+    try {
+      const json = new TextDecoder().decode(Uint8Array.from(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)));
+      Object.assign(cfg, JSON.parse(json));
+      save();
+    } catch (e) { console.warn('ai-triage: bad cfg link'); }
+    history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/[#&]cfg=[A-Za-z0-9_-]+/, '').replace(/^$/, ''));
+  })();
 
   // ── crypto ──
   const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
