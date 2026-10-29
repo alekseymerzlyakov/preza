@@ -850,7 +850,7 @@
     return r.json();
   }
   async function run() {
-    if (!cfg.token || !cfg.api || !cfg.project) { openSettings(); return; }
+    if (!cfg.token || !cfg.api || !cfg.project) { status('▶ запуск — по ссылке докладчика; здесь доступны просмотр и ⟲ Replay', 'warn'); return; }
     replaying = false;
     try {
       const body = { ref: 'refs/heads/' + cfg.ref, variables: cfg.readToken ? [{ key: 'TRIAGE_GITLAB_TOKEN', value: cfg.readToken, variable_type: 'env_var' }] : [] };
